@@ -1,0 +1,99 @@
+:root {
+  /* Colores PrimeVue Aura */
+  --primary-color: #3b82f6;
+  --primary-300: #93c5fd;
+  --primary-600: #2563eb;
+  --primary-50: #eff6ff;
+  --primary-contrast-color: #ffffff;
+  
+  --surface-0: #ffffff;
+  --surface-50: #f8fafc;
+  --surface-100: #f1f5f9;
+  --surface-200: #e2e8f0;
+  --surface-300: #cbd5e1;
+  
+  --blue-50: #eff6ff;
+  --blue-100: #dbeafe;
+  --blue-500: #3b82f6;
+
+  --green-50: #f0fdf4;
+  --green-100: #dcfce7;
+  --green-500: #22c55e;
+
+  --purple-50: #faf5ff;
+  --purple-100: #f3e8ff;
+  --purple-500: #a855f7;
+
+  --orange-50: #fff7ed;
+  --orange-100: #ffedd5;
+  --orange-500: #f97316;
+
+  --surface-ground: #f8fafc;
+  --surface-card: #ffffff;
+  --surface-border: #e2e8f0;
+  --surface-hover: #f1f5f9;
+  
+  --text-color: #0f172a;
+  --text-color-secondary: #64748b;
+  --border-radius: 0.5rem;
+  --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Dark mode */
+.p-dark {
+  --primary-color: #60a5fa;
+  --primary-300: #2563eb;
+  --primary-600: #1d4ed8;
+  --primary-50: #1e293b;
+  
+  --surface-0: #0f172a;
+  --surface-50: #1e293b;
+  --surface-100: #334155;
+  --surface-200: #475569;
+  --surface-300: #64748b;
+  
+  --blue-50: #1e293b;
+  --blue-100: #1e3a8a;
+  --blue-500: #60a5fa;
+
+  --green-50: #064e3b;
+  --green-100: #065f46;
+  --green-500: #4ade80;
+
+  --purple-50: #4c1d95;
+  --purple-100: #581c87;
+  --purple-500: #c084fc;
+
+  --orange-50: #7c2d12;
+  --orange-100: #9a3412;
+  --orange-500: #fb923c;
+
+  --surface-ground: #0f172a;
+  --surface-card: #1e293b;
+  --surface-border: #334155;
+  --surface-hover: #1e293b;
+  --text-color: #f8fafc;
+  --text-color-secondary: #94a3b8;
+}
+
+html, body, #app {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  background-color: var(--surface-ground);
+}
+
+#app {
+  font-family: var(--font-family);
+  color: var(--text-color);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.card {
+    background: var(--surface-card);
+    padding: 2rem;
+    border-radius: 10px;
+    margin-bottom: 2rem;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+}

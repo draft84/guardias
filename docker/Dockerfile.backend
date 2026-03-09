@@ -1,0 +1,37 @@
+FROM php:8.2-cli
+
+# Instalar dependencias del sistema
+RUN apt-get update && apt-get install -y \
+    git \
+    curl \
+    libpng-dev \
+    libonig-dev \
+    libxml2-dev \
+    libzip-dev \
+    libicu-dev \
+    zip \
+    unzip \
+    nodejs \
+    npm \
+    default-mysql-client
+
+# Limpiar caché
+RUN apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Instalar extensiones de PHP
+RUN docker-php-ext-install pdo_mysql mysqli mbstring exif pcntl bcmath gd zip intl
+
+# Instalar Composer
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+
+# Crear usuario del sistema
+RUN useradd -G www-data,root -u 1000 -d /home/appuser appuser
+
+# Establecer directorio de trabajo
+WORKDIR /var/www/html
+
+# Exponer puerto
+EXPOSE 8000
+
+# Comando por defecto
+CMD ["php", "-S", "0.0.0.0:8000", "-t", "public"]

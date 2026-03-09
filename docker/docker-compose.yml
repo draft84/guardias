@@ -1,0 +1,105 @@
+version: '3.8'
+
+services:
+  # Base de datos MySQL
+  database:
+    image: mysql:8.0
+    container_name: guardias_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_DATABASE: guardias
+      MYSQL_USER: guardias_user
+      MYSQL_PASSWORD: guardias_password
+    ports:
+      - "13306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - guardias_network
+
+  # phpMyAdmin
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: guardias_phpmyadmin
+    restart: unless-stopped
+    environment:
+      PMA_HOST: database
+      PMA_PORT: 3306
+      PMA_USER: guardias_user
+      PMA_PASSWORD: guardias_password
+      MYSQL_ROOT_PASSWORD: root_password
+    ports:
+      - "18080:80"
+    depends_on:
+      - database
+    networks:
+      - guardias_network
+
+  # Backend Symfony
+  backend:
+    build:
+      context: ../backend
+      dockerfile: ../docker/Dockerfile.backend
+    container_name: guardias_backend
+    restart: unless-stopped
+    working_dir: /var/www/html
+    volumes:
+      - ../backend:/var/www/html
+    environment:
+      DATABASE_URL: "mysql://guardias_user:guardias_password@database:3306/guardias?serverVersion=8.0&charset=utf8mb4"
+      JWT_SECRET_KEY: /var/www/html/config/jwt/private.pem
+      JWT_PUBLIC_KEY: /var/www/html/config/jwt/public.pem
+      JWT_PASSPHRASE: guardias_jwt_passphrase
+    ports:
+      - "8000:8000"
+    depends_on:
+      - database
+    networks:
+      - guardias_network
+    command: php -S 0.0.0.0:8000 -t public
+
+  # Frontend Vue.js
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: ../docker/Dockerfile.frontend
+    container_name: guardias_frontend
+    restart: unless-stopped
+    working_dir: /app
+    volumes:
+      - ../frontend:/app
+      - /app/node_modules
+    environment:
+      VITE_API_URL: http://localhost:8000
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+    networks:
+      - guardias_network
+    command: npm run dev -- --host
+
+  # Nginx (opcional para producción)
+  nginx:
+    image: nginx:alpine
+    container_name: guardias_nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ../backend/public:/var/www/html/public
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - guardias_network
+
+volumes:
+  mysql_data:
+    driver: local
+
+networks:
+  guardias_network:
+    driver: bridge
