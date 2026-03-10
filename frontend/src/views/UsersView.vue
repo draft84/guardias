@@ -6,21 +6,21 @@
         <i class="pi pi-users text-3xl text-primary"></i>
         <h2 class="text-2xl font-bold m-0">Usuarios</h2>
       </div>
-      <div class="flex gap-2">
-        <Button 
-          label="Exportar" 
-          icon="pi pi-download" 
-          severity="secondary" 
-          outlined 
-          @click="exportUsers" 
+      <div class="flex gap-2" v-if="authStore.isManagerOrAdmin">
+        <Button
+          label="Exportar"
+          icon="pi pi-download"
+          severity="secondary"
+          outlined
+          @click="exportUsers"
           v-tooltip.top="'Exportar usuarios a Excel'"
         />
-        <Button 
-          label="Importar" 
-          icon="pi pi-upload" 
-          severity="secondary" 
-          outlined 
-          @click="showImportDialog" 
+        <Button
+          label="Importar"
+          icon="pi pi-upload"
+          severity="secondary"
+          outlined
+          @click="showImportDialog"
           v-tooltip.top="'Importar usuarios desde Excel'"
         />
         <Button label="Nuevo Usuario" icon="pi pi-plus" @click="openNewUser()" />
@@ -175,13 +175,14 @@
         <Column field="active" header="Estado" :sortable="true" style="min-width: 8rem">
           <template #body="{ data }">
             <div class="flex align-items-center gap-2">
-              <ToggleSwitch v-model="data.active" @change="toggleUserActive(data)" />
+              <ToggleSwitch v-if="authStore.isManagerOrAdmin" v-model="data.active" @change="toggleUserActive(data)" />
+              <span v-else class="pi" :class="data.active ? 'pi-check-circle text-green-500' : 'pi-times-circle text-red-500'" style="font-size: 1.5rem"></span>
               <span :class="data.active ? 'text-green-500' : 'text-red-500'">{{ data.active ? 'Activo' : 'Inactivo' }}</span>
             </div>
           </template>
         </Column>
 
-        <Column header="Acciones" :exportable="false" style="min-width: 8rem">
+        <Column header="Acciones" :exportable="false" style="min-width: 8rem" v-if="authStore.isManagerOrAdmin">
           <template #body="{ data }">
             <Button icon="pi pi-pencil" outlined rounded class="mr-2" @click="editUser(data)" v-tooltip.top="'Editar'" />
             <Button icon="pi pi-trash" outlined rounded severity="danger" @click="confirmDelete(data)" v-tooltip.top="'Eliminar'" />
@@ -357,9 +358,11 @@ import InputIcon from 'primevue/inputicon'
 
 import { useUserStore } from '@/stores/user.store'
 import { useDepartmentStore } from '@/stores/department.store'
+import { useAuthStore } from '@/stores/auth.store'
 
 const userStore = useUserStore()
 const departmentStore = useDepartmentStore()
+const authStore = useAuthStore()
 const confirm = useConfirm()
 const toast = useToast()
 

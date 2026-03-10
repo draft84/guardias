@@ -57,6 +57,8 @@
         </div>
 
         <div class="header-right">
+          <NotificationsBell class="mr-2" />
+          
           <Button
             :icon="layoutStore.isDarkTheme ? 'pi pi-moon' : 'pi pi-sun'"
             text
@@ -94,6 +96,7 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth.store'
 import { useLayoutStore } from '@/stores/layout.store'
 import Button from 'primevue/button'
+import NotificationsBell from '@/components/NotificationsBell.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()

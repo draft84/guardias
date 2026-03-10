@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controller\Api;
 
 use App\Entity\GuardAssignment;
+use App\Entity\Notification;
 use App\Entity\ShiftSwapRequest;
 use App\Entity\User;
 use App\Repository\GuardAssignmentRepository;
@@ -343,19 +344,69 @@ class AssignmentController extends AbstractController
             ], Response::HTTP_BAD_REQUEST);
         }
 
-        $swapRequest = new ShiftSwapRequest();
-        // Configurar solicitud de cambio...
+        // Verificar que el usuario que solicita el cambio es el usuario asignado
+        $currentUserId = method_exists($user, 'getId') ? (string) $user->getId() : null;
+        $assignedUserId = (string) $assignment->getUser()->getId();
         
-        $this->entityManager->persist($swapRequest);
+        if ($currentUserId !== $assignedUserId) {
+            return new JsonResponse([
+                'error' => 'Only the assigned user can request a swap',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
+        // Buscar el nuevo usuario
+        $newUser = $this->entityManager->getRepository(User::class)->find($data['newUserId']);
+        if (!$newUser) {
+            return new JsonResponse([
+                'error' => 'New user not found',
+            ], Response::HTTP_NOT_FOUND);
+        }
+
+        error_log('🔄 SWAP REQUEST - Requested by: ' . $user->getFullName() . ' (' . $user->getEmail() . ')');
+        error_log('🔄 SWAP REQUEST - New user: ' . $newUser->getFullName() . ' (' . $newUser->getEmail() . ')');
+
+        // CREAR NOTIFICACIÓN PARA EL USUARIO SUSTITUTO
+        $notification = new Notification();
+        $notification->setUser($newUser);
+        $notification->setType('swap_request');
+        $notification->setTitle('Solicitud de Cambio de Guardia');
+        $notification->setMessage(
+            sprintf(
+                '%s solicita intercambiar su guardia del %s (%s - %s). ¿Aceptas el cambio?',
+                $user->getFullName(),
+                $assignment->getDate()->format('d/m/Y'),
+                $assignment->getStartTime()->format('H:i'),
+                $assignment->getEndTime()->format('H:i')
+            )
+        );
+        $notification->setData([
+            'type' => 'swap_request',
+            'assignmentId' => (string) $assignment->getId(),
+            'requestedBy' => [
+                'id' => (string) $user->getId(),
+                'fullName' => $user->getFullName(),
+            ],
+            'guard' => [
+                'name' => $assignment->getGuard()->getName(),
+                'date' => $assignment->getDate()->format('Y-m-d'),
+                'startTime' => $assignment->getStartTime()->format('H:i'),
+                'endTime' => $assignment->getEndTime()->format('H:i'),
+            ],
+            'reason' => $data['reason'] ?? null,
+        ]);
+
+        error_log('🔔 SWAP NOTIFICATION - Creating for user: ' . $newUser->getEmail() . ' (ID: ' . $newUser->getId() . ')');
+        error_log('🔔 SWAP NOTIFICATION - Notification user_id: ' . $notification->getUser()->getId());
+
+        $this->entityManager->persist($notification);
         $this->entityManager->flush();
 
+        error_log('🔔 SWAP NOTIFICATION - Created with ID: ' . $notification->getId());
+
         return new JsonResponse([
-            'message' => 'Swap request created successfully',
-            'swapRequest' => [
-                'id' => (string) $swapRequest->getId(),
-                'status' => $swapRequest->getStatus(),
-            ],
-        ], Response::HTTP_CREATED);
+            'message' => 'Solicitud de cambio enviada. El usuario debe aceptar para completar el cambio.',
+            'notificationId' => (string) $notification->getId(),
+        ], Response::HTTP_OK);
     }
 
     #[Route('/swap/{swapId}/approve', name: 'api_assignments_approve_swap', methods: ['PUT'])]
@@ -371,10 +422,91 @@ class AssignmentController extends AbstractController
     public function rejectSwap(string $swapId, Request $request): JsonResponse
     {
         $data = json_decode($request->getContent(), true);
-        
+
         // Lógica para rechazar cambio
         return new JsonResponse([
             'message' => 'Swap rejected',
+        ], Response::HTTP_OK);
+    }
+
+    #[Route('/notifications/{notificationId}/accept-swap', name: 'api_notifications_accept_swap', methods: ['POST'])]
+    public function acceptSwapFromNotification(
+        Notification $notification,
+        #[CurrentUser] UserInterface $user
+    ): JsonResponse {
+        // Verificar que la notificación es para este usuario
+        if ($notification->getUser()->getId() !== $user->getId()) {
+            return new JsonResponse([
+                'error' => 'Unauthorized',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
+        // Verificar que es una notificación de swap
+        $data = $notification->getData();
+        if (!$data || $data['type'] !== 'swap_request') {
+            return new JsonResponse([
+                'error' => 'Invalid notification type',
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        // Buscar la asignación
+        $assignment = $this->entityManager->getRepository(GuardAssignment::class)->find($data['assignmentId']);
+        if (!$assignment) {
+            return new JsonResponse([
+                'error' => 'Assignment not found',
+            ], Response::HTTP_NOT_FOUND);
+        }
+
+        // CAMBIO INMEDIATO - Actualizar la asignación con el nuevo usuario
+        $assignment->setUser($user);
+        
+        // Agregar nota del cambio
+        $existingNotes = $assignment->getNotes() ?? '';
+        $assignment->setNotes(
+            $existingNotes . "\n[Cambio Aceptado: " . 
+            $data['requestedBy']['fullName'] . " → " . $user->getFullName() . 
+            " - " . date('Y-m-d H:i') . "]"
+        );
+
+        // Marcar notificación como leída
+        $notification->setRead(true);
+
+        // Crear notificación para el usuario que solicitó el cambio
+        $requestingUser = $this->entityManager->getRepository(User::class)->find($data['requestedBy']['id']);
+        if ($requestingUser) {
+            $confirmationNotification = new Notification();
+            $confirmationNotification->setUser($requestingUser);
+            $confirmationNotification->setType('swap_accepted');
+            $confirmationNotification->setTitle('Cambio de Guardia Aceptado');
+            $confirmationNotification->setMessage(
+                sprintf(
+                    '%s aceptó el cambio de guardia del %s',
+                    $user->getFullName(),
+                    $assignment->getDate()->format('d/m/Y')
+                )
+            );
+            $confirmationNotification->setData([
+                'type' => 'swap_accepted',
+                'assignmentId' => (string) $assignment->getId(),
+                'acceptedBy' => [
+                    'id' => (string) $user->getId(),
+                    'fullName' => $user->getFullName(),
+                ],
+            ]);
+            $this->entityManager->persist($confirmationNotification);
+        }
+
+        $this->entityManager->flush();
+
+        return new JsonResponse([
+            'message' => 'Cambio de guardia aceptado exitosamente',
+            'assignment' => [
+                'id' => (string) $assignment->getId(),
+                'user' => [
+                    'id' => (string) $user->getId(),
+                    'fullName' => $user->getFullName(),
+                ],
+            ],
         ], Response::HTTP_OK);
     }
 }

@@ -66,7 +66,7 @@
           <Tag :value="data.active ? 'Activa' : 'Inactiva'" :severity="data.active ? 'success' : 'danger'" />
         </template>
       </Column>
-      <Column header="Acciones" :exportable="false" style="min-width: 8rem">
+      <Column header="Acciones" :exportable="false" style="min-width: 8rem" v-if="authStore.isManagerOrAdmin">
         <template #body="{ data }">
           <Button icon="pi pi-pencil" outlined rounded class="mr-2" @click="editGuard(data)" v-tooltip.top="'Editar'" />
           <Button icon="pi pi-trash" outlined rounded severity="danger" @click="confirmDelete(data)" v-tooltip.top="'Eliminar'" />
@@ -101,16 +101,16 @@
         <div class="field col-12 md:col-6" v-if="formData.departmentId">
           <label for="guardUsers" class="font-bold block mb-2">
             Usuarios de Guardia
-            <i class="pi pi-info-circle text-primary ml-1" v-tooltip.left="'Seleccione uno o varios usuarios para crear las asignaciones en el calendario'" />
+            <i class="pi pi-info-circle text-primary ml-1" :v-tooltip.left="editingGuard ? 'Usuarios actualmente asignados a esta guardia' : 'Seleccione uno o varios usuarios para crear las asignaciones en el calendario'" />
           </label>
-          <MultiSelect 
-            id="guardUsers" 
-            v-model="formData.userIds" 
-            :options="usersByDepartment" 
-            :optionLabel="u => u.fullName || (u.firstName + ' ' + u.lastName)" 
-            optionValue="id" 
-            placeholder="Seleccione usuarios" 
-            showClear 
+          <MultiSelect
+            id="guardUsers"
+            v-model="formData.userIds"
+            :options="usersByDepartment"
+            :optionLabel="u => u.fullName || (u.firstName + ' ' + u.lastName)"
+            optionValue="id"
+            :placeholder="editingGuard ? 'Usuarios asignados' : 'Seleccione usuarios'"
+            showClear
             class="w-full"
             display="chip"
           >
@@ -121,6 +121,7 @@
             </template>
           </MultiSelect>
           <small v-if="usersByDepartment.length === 0" class="text-orange-500 mt-1 block">⚠️ No hay usuarios en este departamento</small>
+          <small v-else-if="editingGuard" class="text-primary mt-1 block">💡 Modifique la selección para agregar o quitar usuarios</small>
           <small v-else class="text-primary mt-1 block">💡 Seleccione uno o más usuarios para asignar las guardias automáticamente</small>
         </div>
 
@@ -300,7 +301,7 @@ const openNewGuard = () => {
   }
 }
 
-const editGuard = (guard) => {
+const editGuard = async (guard) => {
   editingGuard.value = guard
   formData.name = guard.name
   formData.departmentId = guard.department || ''
@@ -311,13 +312,38 @@ const editGuard = (guard) => {
   formData.endTime = guard.endTime
   formData.weekDays = guard.weekDays || []
   formData.description = guard.description || ''
+  formData.userIds = [] // Resetear usuarios asignados
 
   if (formData.departmentId) {
-    loadUsersByDepartment()
+    await loadUsersByDepartment()
+    
+    // Cargar usuarios asignados a esta guardia
+    if (usersByDepartment.value.length > 0 && guard.id) {
+      await loadAssignedUsers(guard.id)
+    }
   }
 
   submitted.value = false
   guardDialog.value = true
+}
+
+const loadAssignedUsers = async (guardId) => {
+  const token = localStorage.getItem('token')
+  try {
+    // Obtener asignaciones de esta guardia
+    const response = await fetch(`${API_URL}/api/guards/${guardId}/assignments`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
+    if (response.ok) {
+      const data = await response.json()
+      // Extraer IDs de usuarios únicos de las asignaciones
+      const userIds = [...new Set(data.assignments.map(a => a.user.id))]
+      formData.userIds = userIds
+      console.log('Usuarios asignados:', formData.userIds)
+    }
+  } catch (error) {
+    console.error('Error loading assigned users:', error)
+  }
 }
 
 const confirmDelete = (guard) => {
@@ -404,11 +430,67 @@ const saveGuard = async () => {
       departmentId: formData.departmentId || null
     }
 
-    console.log('Payload enviado al crear guardia:', payload)
+    console.log('Payload enviado:', payload)
+    console.log('User IDs:', formData.userIds)
+
+    const token = localStorage.getItem('token')
 
     if (editingGuard.value) {
+      // Actualizar guardia
       await guardStore.updateGuard(editingGuard.value.id, payload)
       toast.add({ severity: 'success', summary: 'Éxito', detail: 'Guardia actualizada correctamente', life: 3000 })
+      
+      // Calcular fechas para las nuevas asignaciones
+      const datesToAssign = []
+      let currentDate = new Date(formData.validFrom + 'T00:00:00')
+      const endDate = new Date(formData.validUntil + 'T00:00:00')
+
+      while (currentDate <= endDate) {
+        if (formData.weekDays.includes(currentDate.getDay())) {
+          datesToAssign.push(currentDate.toISOString().split('T')[0])
+        }
+        currentDate.setDate(currentDate.getDate() + 1)
+      }
+
+      console.log('Fechas a asignar:', datesToAssign)
+      console.log('Guard ID:', editingGuard.value.id)
+      console.log('Users IDs:', formData.userIds)
+
+      // Eliminar asignaciones existentes de esta guardia
+      await deleteExistingAssignments(editingGuard.value.id)
+
+      // Crear nuevas asignaciones para los usuarios seleccionados
+      let totalCreated = 0
+      for (const userId of formData.userIds) {
+        for (const dateStr of datesToAssign) {
+          const body = {
+            guardId: editingGuard.value.id,
+            userId: userId,
+            date: dateStr,
+            startTime: formData.startTime,
+            endTime: formData.endTime,
+            status: 'scheduled'
+          }
+          console.log('Creando asignación:', body)
+
+          const response = await fetch(`${API_URL}/api/assignments`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify(body)
+          })
+
+          if (!response.ok) {
+            const errorData = await response.json()
+            console.error('Error al crear asignación:', errorData)
+            throw new Error(errorData.message || 'Error al crear asignación')
+          }
+          totalCreated++
+        }
+      }
+
+      const usersCount = formData.userIds.length
+      const datesCount = datesToAssign.length
+      toast.add({ severity: 'success', summary: 'Éxito', detail: `${totalCreated} asignaciones actualizadas (${usersCount} usuarios × ${datesCount} fechas)`, life: 5000 })
       await loadAssignments()
     } else {
       const result = await guardStore.createGuard(payload)
@@ -416,7 +498,6 @@ const saveGuard = async () => {
       toast.add({ severity: 'success', summary: 'Éxito', detail: 'Guardia creada correctamente', life: 3000 })
 
       // Crear las asignaciones para cada usuario seleccionado
-      const token = localStorage.getItem('token')
       const datesToAssign = []
 
       let currentDate = new Date(formData.validFrom + 'T00:00:00')
@@ -474,6 +555,29 @@ const saveGuard = async () => {
     toast.add({ severity: 'error', summary: 'Error', detail: error.message, life: 5000 })
   } finally {
     saving.value = false
+  }
+}
+
+const deleteExistingAssignments = async (guardId) => {
+  const token = localStorage.getItem('token')
+  try {
+    // Obtener todas las asignaciones de esta guardia
+    const response = await fetch(`${API_URL}/api/guards/${guardId}/assignments`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
+    if (response.ok) {
+      const data = await response.json()
+      // Eliminar cada asignación
+      for (const assignment of data.assignments) {
+        await fetch(`${API_URL}/api/assignments/${assignment.id}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
+      }
+      console.log('Asignaciones eliminadas:', data.assignments.length)
+    }
+  } catch (error) {
+    console.error('Error al eliminar asignaciones:', error)
   }
 }
 

@@ -79,11 +79,15 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\OneToMany(targetEntity: ShiftSwapRequest::class, mappedBy: 'requestedBy')]
     private Collection $swapRequests;
 
+    #[ORM\OneToMany(targetEntity: Notification::class, mappedBy: 'user', cascade: ['remove'])]
+    private Collection $notifications;
+
     public function __construct()
     {
         $this->guardAssignments = new ArrayCollection();
         $this->assignedGuards = new ArrayCollection();
         $this->swapRequests = new ArrayCollection();
+        $this->notifications = new ArrayCollection();
         $this->createdAt = new \DateTime();
         $this->updatedAt = new \DateTime();
     }
@@ -253,6 +257,19 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function getSwapRequests(): Collection
     {
         return $this->swapRequests;
+    }
+
+    /**
+     * @return Collection<int, Notification>
+     */
+    public function getNotifications(): Collection
+    {
+        return $this->notifications;
+    }
+
+    public function getUnreadNotificationsCount(): int
+    {
+        return $this->notifications->filter(fn($n) => !$n->isRead())->count();
     }
 
     public function eraseCredentials(): void

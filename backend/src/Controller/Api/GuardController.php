@@ -279,16 +279,33 @@ class GuardController extends AbstractController
     #[Route('/{id}/assignments', name: 'api_guards_assignments', methods: ['GET'])]
     public function getAssignments(Guard $guard): JsonResponse
     {
-        $assignments = $guard->getAssignments();
+        // Verificar permisos
+        $error = $this->checkWritePermissions();
+        if ($error) {
+            return $error;
+        }
         
+        // Verificar si puede ver esta guardia
+        $error = $this->canManageGuard($guard);
+        if ($error) {
+            return $error;
+        }
+
+        $assignments = $guard->getAssignments();
+
         $data = array_map(function ($assignment) {
+            $user = $assignment->getUser();
             return [
                 'id' => (string) $assignment->getId(),
                 'date' => $assignment->getDate()?->format('Y-m-d'),
                 'startTime' => $assignment->getStartTime()?->format('H:i'),
                 'endTime' => $assignment->getEndTime()?->format('H:i'),
                 'status' => $assignment->getStatus(),
-                'user' => $assignment->getUser()?->getFullName(),
+                'user' => [
+                    'id' => (string) $user->getId(),
+                    'fullName' => $user->getFullName(),
+                    'email' => $user->getEmail(),
+                ],
             ];
         }, $assignments->toArray());
 
