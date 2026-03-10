@@ -89,7 +89,7 @@
 
         <div class="field col-12 md:col-6">
           <label for="guardDept" class="font-bold block mb-2">Departamento</label>
-          <Dropdown id="guardDept" v-model="formData.departmentId" :options="departments" optionLabel="name" optionValue="id" placeholder="Seleccione un departamento" showClear class="w-full" @change="loadUsersByDepartment">
+          <Dropdown id="guardDept" v-model="formData.departmentId" :options="filteredDepartments" optionLabel="name" optionValue="id" placeholder="Seleccione un departamento" showClear class="w-full" @change="loadUsersByDepartment">
             <template #option="slotProps">
               <div class="flex align-items-center gap-2">
                 <i class="pi pi-building" />{{ slotProps.option.name }}
@@ -192,6 +192,8 @@ import { useConfirm } from 'primevue/useconfirm'
 import { useToast } from 'primevue/usetoast'
 import { useGuardStore } from '@/stores/guard.store'
 import { useDepartmentStore } from '@/stores/department.store'
+import { useUserStore } from '@/stores/user.store'
+import { useAuthStore } from '@/stores/auth.store'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import InputText from 'primevue/inputtext'
@@ -209,6 +211,8 @@ const API_URL = 'http://localhost:8000'
 
 const guardStore = useGuardStore()
 const departmentStore = useDepartmentStore()
+const userStore = useUserStore()
+const authStore = useAuthStore()
 const confirm = useConfirm()
 const toast = useToast()
 
@@ -282,6 +286,18 @@ const openNewGuard = () => {
   resetForm()
   submitted.value = false
   guardDialog.value = true
+  
+  // Auto-seleccionar departamento del usuario si no es ADMIN
+  let userDeptId = authStore.user?.department
+  if (userDeptId && typeof userDeptId === 'object') {
+    userDeptId = userDeptId.id
+  }
+  
+  if (!authStore.isAdmin && userDeptId) {
+    formData.departmentId = userDeptId
+    console.log('openNewGuard: Auto-seleccionando departamento:', formData.departmentId)
+    loadUsersByDepartment()
+  }
 }
 
 const editGuard = (guard) => {
@@ -295,11 +311,11 @@ const editGuard = (guard) => {
   formData.endTime = guard.endTime
   formData.weekDays = guard.weekDays || []
   formData.description = guard.description || ''
-  
+
   if (formData.departmentId) {
     loadUsersByDepartment()
   }
-  
+
   submitted.value = false
   guardDialog.value = true
 }
@@ -461,9 +477,44 @@ const saveGuard = async () => {
   }
 }
 
+// Filtrar departamentos según el rol del usuario
+const filteredDepartments = computed(() => {
+  if (authStore.isAdmin) {
+    return departments.value
+  }
+  // Si no es ADMIN, solo mostrar su departamento
+  // El departamento puede ser un string (ID) o un objeto con id
+  let userDeptId = authStore.user?.department
+  if (userDeptId && typeof userDeptId === 'object') {
+    userDeptId = userDeptId.id
+  }
+  if (userDeptId) {
+    const dept = departments.value.find(d => d.id === userDeptId)
+    return dept ? [dept] : []
+  }
+  return []
+})
+
 onMounted(async () => {
   guardStore.fetchGuards()
   await departmentStore.fetchDepartments()
   departments.value = departmentStore.departments || []
+  
+  console.log('authStore.user:', authStore.user)
+  console.log('authStore.user.department:', authStore.user?.department)
+  console.log('authStore.isAdmin:', authStore.isAdmin)
+  console.log('departments:', departments.value)
+
+  // Auto-seleccionar departamento del usuario si no es ADMIN
+  let userDeptId = authStore.user?.department
+  if (userDeptId && typeof userDeptId === 'object') {
+    userDeptId = userDeptId.id
+  }
+  
+  if (!authStore.isAdmin && userDeptId) {
+    formData.departmentId = userDeptId
+    console.log('Auto-seleccionando departamento:', formData.departmentId)
+    await loadUsersByDepartment()
+  }
 })
 </script>

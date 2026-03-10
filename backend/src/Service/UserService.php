@@ -9,6 +9,7 @@ use App\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use libphonenumber\PhoneNumberUtil;
+use Symfony\Bundle\SecurityBundle\Security;
 
 class UserService
 {
@@ -16,7 +17,8 @@ class UserService
         private UserRepository $userRepository,
         private EntityManagerInterface $entityManager,
         private UserPasswordHasherInterface $passwordHasher,
-        private PhoneNumberUtil $phoneNumberUtil
+        private PhoneNumberUtil $phoneNumberUtil,
+        private Security $security
     ) {
     }
 
@@ -25,7 +27,20 @@ class UserService
      */
     public function getAllUsers(): array
     {
-        return $this->userRepository->findAll();
+        $user = $this->security->getUser();
+        
+        // ADMIN puede ver todos los usuarios
+        if ($user instanceof User && in_array('ROLE_ADMIN', $user->getRoles(), true)) {
+            return $this->userRepository->findAll();
+        }
+        
+        // Los demás solo ven usuarios de su departamento
+        $userDepartment = $user?->getDepartment();
+        if (!$userDepartment) {
+            return [];
+        }
+        
+        return $this->userRepository->findBy(['department' => $userDepartment]);
     }
 
     /**
@@ -33,12 +48,50 @@ class UserService
      */
     public function getActiveUsers(): array
     {
-        return $this->userRepository->findActiveUsers();
+        $user = $this->security->getUser();
+        
+        // ADMIN puede ver todos los usuarios activos
+        if ($user instanceof User && in_array('ROLE_ADMIN', $user->getRoles(), true)) {
+            return $this->userRepository->findActiveUsers();
+        }
+        
+        // Los demás solo ven usuarios activos de su departamento
+        $userDepartment = $user?->getDepartment();
+        if (!$userDepartment) {
+            return [];
+        }
+        
+        return $this->userRepository->findBy([
+            'department' => $userDepartment,
+            'active' => true
+        ]);
     }
 
     public function getUserById(string $id): ?User
     {
-        return $this->userRepository->find($id);
+        $user = $this->userRepository->find($id);
+        
+        if (!$user) {
+            return null;
+        }
+        
+        // Verificar permisos por departamento
+        $currentUser = $this->security->getUser();
+        
+        // ADMIN puede ver todos
+        if ($currentUser instanceof User && in_array('ROLE_ADMIN', $currentUser->getRoles(), true)) {
+            return $user;
+        }
+        
+        // Los demás solo pueden ver usuarios de su mismo departamento
+        $currentDepartment = $currentUser?->getDepartment();
+        $userDepartment = $user->getDepartment();
+        
+        if (!$currentDepartment || !$userDepartment || $currentDepartment !== $userDepartment) {
+            return null;
+        }
+        
+        return $user;
     }
 
     public function getUserByEmail(string $email): ?User

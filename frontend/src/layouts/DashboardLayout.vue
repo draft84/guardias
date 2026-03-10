@@ -13,7 +13,7 @@
           <span v-if="!sidebarCollapsed">Dashboard</span>
         </router-link>
 
-        <router-link to="/departments" class="nav-item">
+        <router-link v-if="authStore.isAdmin" to="/departments" class="nav-item">
           <i class="pi pi-building"></i>
           <span v-if="!sidebarCollapsed">Departamentos</span>
         </router-link>
@@ -33,7 +33,7 @@
           <span v-if="!sidebarCollapsed">Calendario</span>
         </router-link>
 
-        <router-link to="/settings" class="nav-item">
+        <router-link v-if="authStore.isAdmin" to="/settings" class="nav-item">
           <i class="pi pi-cog"></i>
           <span v-if="!sidebarCollapsed">Configuración</span>
         </router-link>

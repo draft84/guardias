@@ -10,6 +10,10 @@ export const useAuthStore = defineStore('auth', {
   getters: {
     isAuthenticated: (state) => !!state.token,
     isAdmin: (state) => state.user?.roles?.includes('ROLE_ADMIN'),
+    isManager: (state) => state.user?.roles?.includes('ROLE_MANAGER'),
+    isManagerOrAdmin: (state) => {
+      return state.user?.roles?.includes('ROLE_ADMIN') || state.user?.roles?.includes('ROLE_MANAGER')
+    },
     userName: (state) => {state.user?.fullName || state.user?.email || 'Usuario'; console.log("state.user =======> ", state.user); return state.user?.fullName || state.user?.email || 'Usuario';}
   },
 
@@ -17,25 +21,21 @@ export const useAuthStore = defineStore('auth', {
     async login(email, password) {
       try {
         console.log('Intentando login con:', email)
-        
+
         const response = await api.post('/api/auth/login', { email, password })
 
         console.log('Login exitoso, token recibido:', response.data.token ? 'SI' : 'NO')
-        
+
         const data = response.data
         if (data.token) {
           this.token = data.token
           localStorage.setItem('token', data.token)
           console.log('Token guardado en localStorage')
 
-          if (data.user) {
-            this.user = data.user
-            localStorage.setItem('user', JSON.stringify(this.user))
-          } else {
-            await this.fetchUser()
-          }
+          // Siempre hacer fetch del usuario para obtener información completa
+          await this.fetchUser()
         }
-        
+
         return data
       } catch (error) {
         console.error('Login error completo:', error)

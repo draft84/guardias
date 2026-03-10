@@ -1,5 +1,16 @@
 <template>
   <div class="p-4">
+    <!-- Mensaje de Acceso Denegado -->
+    <Message v-if="!authStore.isManagerOrAdmin" severity="error" :closable="false" class="mb-4">
+      <template #icon>
+        <i class="pi pi-lock"></i>
+      </template>
+      <div class="flex flex-column gap-2">
+        <p class="m-0 font-bold">Acceso Restringido</p>
+        <p class="m-0">Esta sección está reservada solo para usuarios con rol <strong>MANAGER</strong> o <strong>ADMIN</strong>.</p>
+      </div>
+    </Message>
+
     <!-- Header -->
     <div class="flex align-items-center gap-2 mb-4">
       <i class="pi pi-cog text-3xl text-primary"></i>
@@ -16,6 +27,10 @@
           <Tab value="1">
             <i class="pi pi-shield mr-2"></i>
             <span>Configuración de Guardias</span>
+          </Tab>
+          <Tab value="2">
+            <i class="pi pi-key mr-2"></i>
+            <span>Roles</span>
           </Tab>
         </TabList>
 
@@ -114,6 +129,65 @@
               </div>
             </div>
           </TabPanel>
+
+          <!-- PANEL ROLES -->
+          <TabPanel value="2">
+            <div class="p-2 flex flex-column align-items-center">
+              <div class="w-full lg:w-8">
+                <div class="flex flex-column sm:flex-row align-items-center justify-content-between mb-4 gap-3">
+                  <div>
+                    <h3 class="text-lg font-bold m-0">Roles del Sistema</h3>
+                    <p class="text-500 text-sm m-0">Define los roles disponibles para los usuarios.</p>
+                  </div>
+                  <div class="flex gap-2 w-full sm:w-auto">
+                    <InputText v-model="newRoleName" placeholder="Nombre del rol (ej: ROLE_SUPERVISOR)" @keyup.enter="addRole" class="flex-1" />
+                    <InputText v-model="newRoleDescription" placeholder="Descripción" @keyup.enter="addRole" class="flex-1" />
+                    <Button label="Agregar" icon="pi pi-plus" @click="addRole" :disabled="!newRoleName" />
+                  </div>
+                </div>
+
+                <DataTable :value="userStore.roles" v-model:editingRows="editingRolesRows" class="p-datatable-sm border-1 surface-border border-round overflow-hidden" :loading="userStore.loading" editMode="row" @row-edit-save="onRoleEditSave">
+                  <Column field="name" header="Nombre del Rol">
+                    <template #body="{ data }">
+                      <Tag :value="data.name" :severity="getRoleSeverity(data.name)" />
+                    </template>
+                    <template #editor="{ data, field }">
+                      <InputText v-model="data[field]" autofocus class="w-full" placeholder="ROLE_XYZ" />
+                    </template>
+                  </Column>
+                  <Column field="description" header="Descripción">
+                    <template #editor="{ data, field }">
+                      <InputText v-model="data[field]" autofocus class="w-full" />
+                    </template>
+                  </Column>
+                  <Column field="isUsed" header="Estado" style="min-width: 8rem">
+                    <template #body="{ data }">
+                      <Tag :value="data.isUsed ? 'En uso' : 'Disponible'" :severity="data.isUsed ? 'success' : 'secondary'" />
+                    </template>
+                  </Column>
+                  <Column :rowEditor="true" style="width: 3rem" bodyStyle="text-align:center"></Column>
+                  <Column header="Acciones" style="width: 3rem" class="text-center">
+                    <template #body="slotProps">
+                      <Button
+                        icon="pi pi-trash"
+                        severity="danger"
+                        text
+                        rounded
+                        @click="removeRole(slotProps.data)"
+                        :title="slotProps.data.isUsed ? 'Este rol está en uso y no se puede eliminar' : 'Eliminar rol'"
+                        :disabled="slotProps.data.isUsed"
+                      />
+                    </template>
+                  </Column>
+                </DataTable>
+
+                <Message severity="info" :closable="false" class="mt-4">
+                  <i class="pi pi-info-circle mr-2"></i>
+                  Los roles en uso (asignados a usuarios) no pueden ser eliminados.
+                </Message>
+              </div>
+            </div>
+          </TabPanel>
         </TabPanels>
       </Tabs>
     </div>
@@ -147,11 +221,24 @@ const toast = useToast()
 const changingPassword = ref(false)
 const submitted = ref(false)
 const newLevelName = ref('')
+const newRoleName = ref('')
+const newRoleDescription = ref('')
 const editingRows = ref([])
+const editingRolesRows = ref([])
 
 onMounted(() => {
   userStore.fetchLevels()
+  userStore.fetchRoles()
 })
+
+const getRoleSeverity = (roleName) => {
+  switch (roleName) {
+    case 'ROLE_ADMIN': return 'danger'
+    case 'ROLE_MANAGER': return 'warning'
+    case 'ROLE_USER': return 'info'
+    default: return 'secondary'
+  }
+}
 
 const addLevel = async () => {
   if (!newLevelName.value.trim()) return
@@ -183,7 +270,7 @@ const removeLevel = (level) => {
     toast.add({ severity: 'warn', summary: 'No permitido', detail: 'Nivel en uso por usuarios', life: 3000 })
     return
   }
-  
+
   confirm.require({
     message: `¿Estás seguro de eliminar el nivel "${level.name}"?`,
     header: 'Confirmación',
@@ -193,6 +280,56 @@ const removeLevel = (level) => {
       try {
         await userStore.deleteLevel(level.id)
         toast.add({ severity: 'success', summary: 'Eliminado', detail: 'Nivel eliminado correctamente', life: 3000 })
+      } catch (error) {
+        toast.add({ severity: 'error', summary: 'Error', detail: error.message, life: 3000 })
+      }
+    }
+  })
+}
+
+// Funciones para Roles
+const addRole = async () => {
+  if (!newRoleName.value.trim()) return
+  try {
+    await userStore.createRole(newRoleName.value.trim().toUpperCase().replace(/\s/g, '_'), newRoleDescription.value.trim())
+    newRoleName.value = ''
+    newRoleDescription.value = ''
+    toast.add({ severity: 'success', summary: 'Éxito', detail: 'Rol creado correctamente', life: 3000 })
+  } catch (error) {
+    toast.add({ severity: 'error', summary: 'Error', detail: error.message, life: 3000 })
+  }
+}
+
+const onRoleEditSave = async (event) => {
+  let { data, newData } = event
+  if (newData.name.trim().length > 0) {
+    try {
+      const roleName = newData.name.trim().toUpperCase().replace(/\s/g, '_')
+      await userStore.updateRole(newData.id, roleName, newData.description?.trim())
+      toast.add({ severity: 'success', summary: 'Actualizado', detail: 'Rol actualizado correctamente', life: 3000 })
+    } catch (error) {
+      toast.add({ severity: 'error', summary: 'Error', detail: error.message, life: 3000 })
+    }
+  } else {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'El nombre no puede estar vacío', life: 3000 })
+  }
+}
+
+const removeRole = (role) => {
+  if (role.isUsed) {
+    toast.add({ severity: 'warn', summary: 'No permitido', detail: 'Rol en uso por usuarios', life: 3000 })
+    return
+  }
+
+  confirm.require({
+    message: `¿Estás seguro de eliminar el rol "${role.name}"?`,
+    header: 'Confirmación',
+    icon: 'pi pi-exclamation-triangle',
+    acceptClass: 'p-button-danger',
+    accept: async () => {
+      try {
+        await userStore.deleteRole(role.id)
+        toast.add({ severity: 'success', summary: 'Eliminado', detail: 'Rol eliminado correctamente', life: 3000 })
       } catch (error) {
         toast.add({ severity: 'error', summary: 'Error', detail: error.message, life: 3000 })
       }

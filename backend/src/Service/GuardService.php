@@ -6,16 +6,19 @@ namespace App\Service;
 
 use App\Entity\Guard;
 use App\Entity\GuardAssignment;
+use App\Entity\User;
 use App\Repository\GuardRepository;
 use App\Repository\GuardAssignmentRepository;
 use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Bundle\SecurityBundle\Security;
 
 class GuardService
 {
     public function __construct(
         private GuardRepository $guardRepository,
         private GuardAssignmentRepository $assignmentRepository,
-        private EntityManagerInterface $entityManager
+        private EntityManagerInterface $entityManager,
+        private Security $security
     ) {}
 
     /**
@@ -23,7 +26,20 @@ class GuardService
      */
     public function getAllGuards(): array
     {
-        return $this->guardRepository->findAll();
+        $user = $this->security->getUser();
+        
+        // Si es ADMIN, devuelve todas las guardias
+        if ($user instanceof User && in_array('ROLE_ADMIN', $user->getRoles(), true)) {
+            return $this->guardRepository->findAll();
+        }
+        
+        // Si no, solo las del departamento del usuario
+        $department = $user?->getDepartment();
+        if (!$department) {
+            return [];
+        }
+        
+        return $this->guardRepository->findBy(['department' => $department]);
     }
 
     /**
@@ -31,12 +47,54 @@ class GuardService
      */
     public function getActiveGuards(): array
     {
-        return $this->guardRepository->findActiveGuards();
+        $user = $this->security->getUser();
+        
+        // Si es ADMIN, devuelve todas las guardias activas
+        if ($user instanceof User && in_array('ROLE_ADMIN', $user->getRoles(), true)) {
+            return $this->guardRepository->findActiveGuards();
+        }
+        
+        // Si no, solo las del departamento del usuario
+        $department = $user?->getDepartment();
+        if (!$department) {
+            return [];
+        }
+        
+        return $this->guardRepository->findBy([
+            'department' => $department,
+            'active' => true
+        ]);
     }
 
     public function getGuardById(string $id): ?Guard
     {
-        return $this->guardRepository->find($id);
+        $guard = $this->guardRepository->find($id);
+        
+        if (!$guard) {
+            return null;
+        }
+        
+        // Verificar permisos por departamento
+        $user = $this->security->getUser();
+        
+        // ADMIN puede ver todas
+        if ($user instanceof User && in_array('ROLE_ADMIN', $user->getRoles(), true)) {
+            return $guard;
+        }
+        
+        // Los demás solo pueden ver las de su departamento
+        $userDepartment = $user?->getDepartment();
+        $guardDepartment = $guard->getDepartment();
+        
+        if (!$userDepartment || !$guardDepartment) {
+            return null;
+        }
+        
+        if ($userDepartment !== $guardDepartment) {
+            return null;
+        }
+        
+        return $guard;
     }
 
     /**

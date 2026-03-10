@@ -6,6 +6,7 @@ namespace App\Controller\Api;
 
 use App\Entity\GuardAssignment;
 use App\Entity\ShiftSwapRequest;
+use App\Entity\User;
 use App\Repository\GuardAssignmentRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -26,11 +27,37 @@ class AssignmentController extends AbstractController
         private EntityManagerInterface $entityManager
     ) {}
 
+    /**
+     * Filtra las asignaciones por departamento del usuario actual
+     */
+    private function filterByDepartment(array $assignments): array
+    {
+        $user = $this->getUser();
+        
+        // ADMIN puede ver todas las asignaciones
+        if ($user instanceof User && in_array('ROLE_ADMIN', $user->getRoles(), true)) {
+            return $assignments;
+        }
+        
+        // Los demás solo ven asignaciones de su departamento
+        $userDepartment = $user?->getDepartment();
+        
+        if (!$userDepartment) {
+            return [];
+        }
+        
+        return array_filter($assignments, function (GuardAssignment $assignment) use ($userDepartment) {
+            $guard = $assignment->getGuard();
+            return $guard && $guard->getDepartment() === $userDepartment;
+        });
+    }
+
     #[Route('', name: 'api_assignments_list', methods: ['GET'])]
     public function list(): JsonResponse
     {
         $assignments = $this->assignmentRepository->findAll();
-        
+        $assignments = $this->filterByDepartment($assignments);
+
         $data = array_map(function (GuardAssignment $assignment) {
             return [
                 'id' => (string) $assignment->getId(),
@@ -73,6 +100,7 @@ class AssignmentController extends AbstractController
 
         // Obtener todas las asignaciones
         $assignments = $this->assignmentRepository->findAll();
+        $assignments = $this->filterByDepartment($assignments);
 
         foreach ($assignments as $assignment) {
             $assignDate = $assignment->getDate();
@@ -82,7 +110,7 @@ class AssignmentController extends AbstractController
                 $assignDateOnly->setTime(0, 0, 0);
                 $startDateOnly = (clone $startDate)->setTime(0, 0, 0);
                 $endDateOnly = (clone $endDate)->setTime(0, 0, 0);
-                
+
                 if ($assignDateOnly >= $startDateOnly && $assignDateOnly <= $endDateOnly) {
                     $allAssignments[] = [
                         'id' => (string) $assignment->getId(),

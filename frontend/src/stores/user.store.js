@@ -6,6 +6,7 @@ export const useUserStore = defineStore('user', {
   state: () => ({
     users: [],
     levels: [],
+    roles: [],
     loading: false,
     error: null
   }),
@@ -201,17 +202,95 @@ export const useUserStore = defineStore('user', {
       const token = localStorage.getItem('token')
       const response = await fetch(`${API_URL}/api/users/${id}`, {
         method: 'DELETE',
-        headers: { 
+        headers: {
           'Authorization': `Bearer ${token}`
         }
       })
-      
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
         throw new Error(errorData.message || 'Error al eliminar usuario')
       }
-      
+
       await this.fetchUsers()
+    },
+
+    async fetchRoles() {
+      this.loading = true
+      try {
+        const token = localStorage.getItem('token')
+        const response = await fetch(`${API_URL}/api/roles`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        })
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(errorData.message || 'Error al obtener roles')
+        }
+        const data = await response.json()
+        this.roles = data.roles || []
+      } catch (error) {
+        console.error('Error fetching roles:', error)
+        this.error = error.message
+        throw error
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async createRole(name, description = null) {
+      const token = localStorage.getItem('token')
+      const response = await fetch(`${API_URL}/api/roles`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ name, description })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Error al crear rol')
+      }
+
+      await this.fetchRoles()
+    },
+
+    async updateRole(id, name, description = null) {
+      const token = localStorage.getItem('token')
+      const response = await fetch(`${API_URL}/api/roles/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ name, description })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Error al actualizar rol')
+      }
+
+      await this.fetchRoles()
+    },
+
+    async deleteRole(id) {
+      const token = localStorage.getItem('token')
+      const response = await fetch(`${API_URL}/api/roles/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Error al eliminar rol')
+      }
+
+      await this.fetchRoles()
     }
   }
 })

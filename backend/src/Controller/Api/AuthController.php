@@ -100,6 +100,8 @@ class AuthController extends AbstractController
                 'lastName' => method_exists($user, 'getLastName') ? $user->getLastName() : null,
                 'fullName' => method_exists($user, 'getFullName') ? $user->getFullName() : null,
                 'roles' => method_exists($user, 'getRoles') ? $user->getRoles() : [],
+                'department' => method_exists($user, 'getDepartment') && $user->getDepartment() ? (string) $user->getDepartment()->getId() : null,
+                'departmentName' => method_exists($user, 'getDepartment') && $user->getDepartment() ? $user->getDepartment()->getName() : null,
             ],
         ], Response::HTTP_OK);
     }

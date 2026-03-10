@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Controller\Api;
 
 use App\Entity\Department;
-use App\Repository\DepartmentRepository;
+use App\Entity\User;
+use App\Service\DepartmentService;
+use App\Traits\CurrentUserTrait;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -18,16 +20,18 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 #[IsGranted('IS_AUTHENTICATED_FULLY')]
 class DepartmentController extends AbstractController
 {
+    use CurrentUserTrait;
+
     public function __construct(
-        private DepartmentRepository $departmentRepository,
+        private DepartmentService $departmentService,
         private EntityManagerInterface $entityManager
     ) {}
 
     #[Route('', name: 'api_departments_list', methods: ['GET'])]
     public function list(): JsonResponse
     {
-        $departments = $this->departmentRepository->findAll();
-        
+        $departments = $this->departmentService->getAllDepartments();
+
         $data = array_map(function (Department $department) {
             return [
                 'id' => (string) $department->getId(),
@@ -47,8 +51,8 @@ class DepartmentController extends AbstractController
     #[Route('/active', name: 'api_departments_active', methods: ['GET'])]
     public function listActive(): JsonResponse
     {
-        $departments = $this->departmentRepository->findActiveDepartments();
-        
+        $departments = $this->departmentService->getActiveDepartments();
+
         $data = array_map(function (Department $department) {
             return [
                 'id' => (string) $department->getId(),
@@ -63,8 +67,14 @@ class DepartmentController extends AbstractController
     }
 
     #[Route('/{id}', name: 'api_departments_get', methods: ['GET'])]
-    public function get(Department $department): JsonResponse
+    public function get(string $id): JsonResponse
     {
+        $department = $this->departmentService->getDepartmentById($id);
+
+        if (!$department) {
+            return new JsonResponse(['error' => 'Department not found or access denied'], Response::HTTP_NOT_FOUND);
+        }
+
         $data = [
             'id' => (string) $department->getId(),
             'name' => $department->getName(),
@@ -82,6 +92,12 @@ class DepartmentController extends AbstractController
     #[Route('', name: 'api_departments_create', methods: ['POST'])]
     public function create(Request $request): JsonResponse
     {
+        // Verificar permisos de escritura
+        $error = $this->checkWritePermissions();
+        if ($error) {
+            return $error;
+        }
+
         $data = json_decode($request->getContent(), true);
 
         if (empty($data['name']) || empty($data['code'])) {
@@ -95,6 +111,15 @@ class DepartmentController extends AbstractController
         $department->setCode($data['code']);
         $department->setDescription($data['description'] ?? null);
         $department->setActive($data['active'] ?? true);
+
+        // Si es MANAGER, asignar automáticamente su departamento
+        $user = $this->getUser();
+        if ($user instanceof User && in_array('ROLE_MANAGER', $user->getRoles(), true)) {
+            $userDepartment = $user->getDepartment();
+            if ($userDepartment) {
+                $department->setParentDepartment($userDepartment);
+            }
+        }
 
         $this->entityManager->persist($department);
         $this->entityManager->flush();
@@ -112,6 +137,18 @@ class DepartmentController extends AbstractController
     #[Route('/{id}', name: 'api_departments_update', methods: ['PUT'])]
     public function update(Request $request, Department $department): JsonResponse
     {
+        // Verificar permisos de escritura
+        $error = $this->checkWritePermissions();
+        if ($error) {
+            return $error;
+        }
+
+        // Verificar si puede gestionar este departamento
+        $error = $this->canManageDepartment($department);
+        if ($error) {
+            return $error;
+        }
+
         $data = json_decode($request->getContent(), true);
 
         if (isset($data['name'])) {
@@ -142,6 +179,18 @@ class DepartmentController extends AbstractController
     #[Route('/{id}', name: 'api_departments_delete', methods: ['DELETE'])]
     public function delete(Department $department): JsonResponse
     {
+        // Verificar permisos de escritura
+        $error = $this->checkWritePermissions();
+        if ($error) {
+            return $error;
+        }
+
+        // Verificar si puede gestionar este departamento
+        $error = $this->canManageDepartment($department);
+        if ($error) {
+            return $error;
+        }
+
         $this->entityManager->remove($department);
         $this->entityManager->flush();
 
@@ -153,6 +202,12 @@ class DepartmentController extends AbstractController
     #[Route('/{id}/users', name: 'api_departments_users', methods: ['GET'])]
     public function getUsers(Department $department): JsonResponse
     {
+        // Verificar si puede ver este departamento
+        $error = $this->canManageDepartment($department);
+        if ($error) {
+            return $error;
+        }
+
         $users = $department->getUsers();
 
         $data = array_map(function ($user) {

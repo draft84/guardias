@@ -5,7 +5,8 @@ declare(strict_types=1);
 namespace App\Controller\Api;
 
 use App\Entity\Guard;
-use App\Repository\GuardRepository;
+use App\Service\GuardService;
+use App\Traits\CurrentUserTrait;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -18,15 +19,17 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 #[IsGranted('IS_AUTHENTICATED_FULLY')]
 class GuardController extends AbstractController
 {
+    use CurrentUserTrait;
+
     public function __construct(
-        private GuardRepository $guardRepository,
+        private GuardService $guardService,
         private EntityManagerInterface $entityManager
     ) {}
 
     #[Route('', name: 'api_guards_list', methods: ['GET'])]
     public function list(): JsonResponse
     {
-        $guards = $this->guardRepository->findAll();
+        $guards = $this->guardService->getAllGuards();
 
         $data = array_map(function (Guard $guard) {
             $firstAssignment = $guard->getAssignments()->first();
@@ -55,8 +58,8 @@ class GuardController extends AbstractController
     #[Route('/active', name: 'api_guards_active', methods: ['GET'])]
     public function listActive(): JsonResponse
     {
-        $guards = $this->guardRepository->findActiveGuards();
-        
+        $guards = $this->guardService->getActiveGuards();
+
         $data = array_map(function (Guard $guard) {
             return [
                 'id' => (string) $guard->getId(),
@@ -76,8 +79,14 @@ class GuardController extends AbstractController
     }
 
     #[Route('/{id}', name: 'api_guards_get', methods: ['GET'])]
-    public function get(Guard $guard): JsonResponse
+    public function get(string $id): JsonResponse
     {
+        $guard = $this->guardService->getGuardById($id);
+        
+        if (!$guard) {
+            return new JsonResponse(['error' => 'Guard not found or access denied'], Response::HTTP_NOT_FOUND);
+        }
+        
         $firstAssignment = $guard->getAssignments()->first();
         $data = [
             'id' => (string) $guard->getId(),
@@ -102,6 +111,12 @@ class GuardController extends AbstractController
     #[Route('', name: 'api_guards_create', methods: ['POST'])]
     public function create(Request $request): JsonResponse
     {
+        // Verificar permisos de escritura
+        $error = $this->checkWritePermissions();
+        if ($error) {
+            return $error;
+        }
+
         $data = json_decode($request->getContent(), true);
 
         if (empty($data['name']) ||
@@ -118,12 +133,12 @@ class GuardController extends AbstractController
         $guard->setStartTime(new \DateTime($data['startTime']));
         $guard->setEndTime(new \DateTime($data['endTime']));
         $guard->setActive($data['active'] ?? true);
-        
+
         // Asignar días de la semana si se proporcionan
         if (isset($data['weekDays']) && is_array($data['weekDays'])) {
             $guard->setWeekDays($data['weekDays']);
         }
-        
+
         // Asignar fecha de inicio y fin de validez
         if (isset($data['validFrom']) && !empty($data['validFrom'])) {
             $guard->setValidFrom(new \DateTime($data['validFrom']));
@@ -136,6 +151,11 @@ class GuardController extends AbstractController
         if (isset($data['departmentId']) && !empty($data['departmentId'])) {
             $department = $this->entityManager->getRepository(\App\Entity\Department::class)->find($data['departmentId']);
             if ($department) {
+                // Verificar que el MANAGER solo pueda crear guardias en su departamento
+                $error = $this->canManageDepartment($department);
+                if ($error) {
+                    return $error;
+                }
                 $guard->setDepartment($department);
             }
         }
@@ -155,6 +175,18 @@ class GuardController extends AbstractController
     #[Route('/{id}', name: 'api_guards_update', methods: ['PUT'])]
     public function update(Request $request, Guard $guard): JsonResponse
     {
+        // Verificar permisos de escritura
+        $error = $this->checkWritePermissions();
+        if ($error) {
+            return $error;
+        }
+
+        // Verificar si puede gestionar esta guardia
+        $error = $this->canManageGuard($guard);
+        if ($error) {
+            return $error;
+        }
+
         $data = json_decode($request->getContent(), true);
 
         if (isset($data['name'])) {
@@ -172,7 +204,7 @@ class GuardController extends AbstractController
         if (isset($data['active'])) {
             $guard->setActive($data['active']);
         }
-        
+
         // Actualizar días de la semana
         if (array_key_exists('weekDays', $data)) {
             $guard->setWeekDays($data['weekDays']);
@@ -199,6 +231,11 @@ class GuardController extends AbstractController
             } else {
                 $department = $this->entityManager->getRepository(\App\Entity\Department::class)->find($data['departmentId']);
                 if ($department) {
+                    // Verificar que el MANAGER solo pueda asignar guardias a su departamento
+                    $error = $this->canManageDepartment($department);
+                    if ($error) {
+                        return $error;
+                    }
                     $guard->setDepartment($department);
                 }
             }
@@ -219,6 +256,18 @@ class GuardController extends AbstractController
     #[Route('/{id}', name: 'api_guards_delete', methods: ['DELETE'])]
     public function delete(Guard $guard): JsonResponse
     {
+        // Verificar permisos de escritura
+        $error = $this->checkWritePermissions();
+        if ($error) {
+            return $error;
+        }
+
+        // Verificar si puede gestionar esta guardia
+        $error = $this->canManageGuard($guard);
+        if ($error) {
+            return $error;
+        }
+
         $this->entityManager->remove($guard);
         $this->entityManager->flush();
 

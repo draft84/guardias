@@ -1,5 +1,19 @@
 <template>
   <div class="p-4">
+    <!-- Mensaje de Acceso Denegado -->
+    <Message v-if="$route.query.access === 'denied'" severity="warn" :closable="false" class="mb-4">
+      <template #icon>
+        <i class="pi pi-exclamation-triangle"></i>
+      </template>
+      <div class="flex flex-column gap-2">
+        <p class="m-0 font-bold">Acceso Denegado</p>
+        <p class="m-0">
+          No tienes permisos para acceder a la sección de 
+          <strong>{{ getSectionName($route.query.section) }}</strong>. 
+          Solo los usuarios con rol <strong>ADMINISTRADOR</strong> pueden acceder.
+        </p>
+      </div>
+    </Message>
 
     <!-- Header -->
     <div class="flex align-items-center gap-2 mb-5">
@@ -73,10 +87,19 @@ import { useUserStore } from '@/stores/user.store'
 import { useDepartmentStore } from '@/stores/department.store'
 import { useGuardStore } from '@/stores/guard.store'
 import Button from 'primevue/button'
+import Message from 'primevue/message'
 
 const userStore = useUserStore()
 const departmentStore = useDepartmentStore()
 const guardStore = useGuardStore()
+
+const getSectionName = (section) => {
+  const names = {
+    'Departments': 'Departamentos',
+    'Settings': 'Configuración'
+  }
+  return names[section] || section || 'esta sección'
+}
 
 onMounted(() => {
   userStore.fetchUsers()

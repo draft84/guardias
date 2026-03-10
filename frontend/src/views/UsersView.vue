@@ -272,12 +272,6 @@ const submitted = ref(false)
 const saving = ref(false)
 const departments = ref([])
 
-const roleOptions = [
-  { label: 'Usuario', value: 'ROLE_USER', icon: 'pi pi-user' },
-  { label: 'Manager', value: 'ROLE_MANAGER', icon: 'pi pi-briefcase' },
-  { label: 'Administrador', value: 'ROLE_ADMIN', icon: 'pi pi-shield' }
-]
-
 const filters = ref({
     global: { value: null, matchMode: FilterMatchMode.CONTAINS },
     firstName: { value: null, matchMode: FilterMatchMode.STARTS_WITH },
@@ -296,6 +290,23 @@ const formData = reactive({
   role: 'ROLE_USER',
   active: true
 })
+
+// Roles dinámicos desde el store
+const roleOptions = computed(() => {
+  return userStore.roles.map(role => ({
+    label: role.name.replace('ROLE_', '').replace('_', ' '),
+    value: role.name,
+    icon: getRoleIcon(role.name)
+  }))
+})
+
+const getRoleIcon = (roleName) => {
+  switch (roleName) {
+    case 'ROLE_ADMIN': return 'pi pi-shield'
+    case 'ROLE_MANAGER': return 'pi pi-briefcase'
+    default: return 'pi pi-user'
+  }
+}
 
 const isPhoneValid = computed(() => {
   if (!formData.phone) return true
@@ -439,6 +450,7 @@ const saveUser = async () => {
 onMounted(async () => {
   userStore.fetchUsers()
   userStore.fetchLevels()
+  userStore.fetchRoles()
   await departmentStore.fetchDepartments()
   departments.value = departmentStore.departments || []
 })

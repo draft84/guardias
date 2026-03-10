@@ -59,7 +59,8 @@ const routes = [
       {
         path: 'settings',
         name: 'Settings',
-        component: SettingsView
+        component: SettingsView,
+        meta: { requiresManagerOrAdmin: true }
       }
     ]
   },
@@ -78,17 +79,60 @@ const router = createRouter({
 // Guard de navegación
 router.beforeEach((to, from, next) => {
   const token = localStorage.getItem('token')
+  const user = JSON.parse(localStorage.getItem('user') || 'null')
   const isAuthenticated = !!token
   const requiresAuth = to.matched.some(record => record.meta.requiresAuth)
   const requiresGuest = to.matched.some(record => record.meta.requiresGuest)
+  const requiresManagerOrAdmin = to.matched.some(record => record.meta.requiresManagerOrAdmin)
+  const requiresAdmin = to.path === '/departments' || to.path === '/settings'
 
+  // Verificar si requiere autenticación
   if (requiresAuth && !isAuthenticated) {
     next('/day-shifts')
-  } else if (requiresGuest && isAuthenticated && to.path !== '/day-shifts') {
-    next('/')
-  } else {
-    next()
+    return
   }
+
+  // Verificar si es guest y ya está autenticado
+  if (requiresGuest && isAuthenticated && to.path !== '/day-shifts') {
+    next('/')
+    return
+  }
+
+  // Verificar si requiere rol ADMIN (Departamentos y Configuración)
+  if (requiresAdmin) {
+    if (!isAuthenticated) {
+      next('/day-shifts')
+      return
+    }
+
+    const roles = user?.roles || []
+    const isAdmin = roles.includes('ROLE_ADMIN')
+
+    if (!isAdmin) {
+      // Redirigir al dashboard si no es ADMIN
+      next({ name: 'Dashboard', query: { access: 'denied', section: to.name } })
+      return
+    }
+  }
+
+  // Verificar si requiere rol MANAGER o ADMIN (otras secciones protegidas)
+  if (requiresManagerOrAdmin) {
+    if (!isAuthenticated) {
+      next('/day-shifts')
+      return
+    }
+
+    const roles = user?.roles || []
+    const isManagerOrAdmin = roles.includes('ROLE_ADMIN') || roles.includes('ROLE_MANAGER')
+
+    if (!isManagerOrAdmin) {
+      // Redirigir al dashboard si no tiene permisos
+      next({ name: 'Dashboard', query: { access: 'denied', section: to.name } })
+      return
+    }
+  }
+
+  next()
 })
 
 export default router

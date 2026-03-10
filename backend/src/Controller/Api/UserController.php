@@ -5,7 +5,8 @@ declare(strict_types=1);
 namespace App\Controller\Api;
 
 use App\Entity\User;
-use App\Repository\UserRepository;
+use App\Service\UserService;
+use App\Traits\CurrentUserTrait;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -23,8 +24,10 @@ use libphonenumber\NumberParseException;
 #[IsGranted('IS_AUTHENTICATED_FULLY')]
 class UserController extends AbstractController
 {
+    use CurrentUserTrait;
+
     public function __construct(
-        private UserRepository $userRepository,
+        private UserService $userService,
         private EntityManagerInterface $entityManager,
         private UserPasswordHasherInterface $passwordHasher,
         private ValidatorInterface $validator,
@@ -64,7 +67,7 @@ class UserController extends AbstractController
     #[Route('', name: 'api_users_list', methods: ['GET'])]
     public function list(): JsonResponse
     {
-        $users = $this->userRepository->findAll();
+        $users = $this->userService->getAllUsers();
 
         $data = array_map(function (User $user) {
             return [
@@ -90,7 +93,7 @@ class UserController extends AbstractController
     #[Route('/active', name: 'api_users_active', methods: ['GET'])]
     public function listActive(): JsonResponse
     {
-        $users = $this->userRepository->findActiveUsers();
+        $users = $this->userService->getActiveUsers();
 
         $data = array_map(function (User $user) {
             return [
@@ -107,8 +110,14 @@ class UserController extends AbstractController
     }
 
     #[Route('/{id}', name: 'api_users_get', methods: ['GET'])]
-    public function get(User $user): JsonResponse
+    public function get(string $id): JsonResponse
     {
+        $user = $this->userService->getUserById($id);
+        
+        if (!$user) {
+            return new JsonResponse(['error' => 'User not found or access denied'], Response::HTTP_NOT_FOUND);
+        }
+        
         $data = [
             'id' => (string) $user->getId(),
             'email' => $user->getEmail(),
@@ -132,6 +141,12 @@ class UserController extends AbstractController
     #[Route('', name: 'api_users_create', methods: ['POST'])]
     public function create(Request $request): JsonResponse
     {
+        // Verificar permisos de escritura
+        $error = $this->checkWritePermissions();
+        if ($error) {
+            return $error;
+        }
+
         $data = json_decode($request->getContent(), true);
 
         $required = ['email', 'password', 'firstName', 'lastName', 'phone', 'departmentId', 'roles'];
@@ -169,6 +184,11 @@ class UserController extends AbstractController
         if (isset($data['departmentId']) && !empty($data['departmentId'])) {
             $department = $this->entityManager->getRepository(\App\Entity\Department::class)->find($data['departmentId']);
             if ($department) {
+                // Verificar que el MANAGER solo pueda crear usuarios en su departamento
+                $error = $this->canManageDepartment($department);
+                if ($error) {
+                    return $error;
+                }
                 $user->setDepartment($department);
             }
         }
@@ -211,6 +231,18 @@ class UserController extends AbstractController
     #[Route('/{id}', name: 'api_users_update', methods: ['PUT'])]
     public function update(Request $request, User $user): JsonResponse
     {
+        // Verificar permisos de escritura
+        $error = $this->checkWritePermissions();
+        if ($error) {
+            return $error;
+        }
+
+        // Verificar si puede gestionar este usuario
+        $error = $this->canManageUser($user);
+        if ($error) {
+            return $error;
+        }
+
         $data = json_decode($request->getContent(), true);
 
         if (isset($data['email'])) {
@@ -252,6 +284,11 @@ class UserController extends AbstractController
             } else {
                 $department = $this->entityManager->getRepository(\App\Entity\Department::class)->find($data['departmentId']);
                 if ($department) {
+                    // Verificar que el MANAGER solo pueda asignar usuarios a su departamento
+                    $error = $this->canManageDepartment($department);
+                    if ($error) {
+                        return $error;
+                    }
                     $user->setDepartment($department);
                 }
             }
@@ -285,6 +322,18 @@ class UserController extends AbstractController
     #[Route('/{id}', name: 'api_users_delete', methods: ['DELETE'])]
     public function delete(User $user): JsonResponse
     {
+        // Verificar permisos de escritura
+        $error = $this->checkWritePermissions();
+        if ($error) {
+            return $error;
+        }
+
+        // Verificar si puede gestionar este usuario
+        $error = $this->canManageUser($user);
+        if ($error) {
+            return $error;
+        }
+
         $this->entityManager->remove($user);
         $this->entityManager->flush();
 
@@ -296,21 +345,55 @@ class UserController extends AbstractController
     #[Route('/department/{departmentId}', name: 'api_users_by_department', methods: ['GET'])]
     public function getByDepartment(string $departmentId): JsonResponse
     {
-        error_log("=== BUSCANDO USUARIOS PARA DEPT: $departmentId ===");
-        $users = $this->userRepository->findByDepartment($departmentId);
-        error_log("=== USUARIOS ENCONTRADOS: " . count($users) . " ===");
+        // Verificar autenticación
+        $user = $this->getUser();
+        
+        if (!$user instanceof User) {
+            return new JsonResponse(
+                ['error' => 'Usuario no autenticado'],
+                Response::HTTP_UNAUTHORIZED
+            );
+        }
+        
+        // ADMIN puede ver todos los departamentos
+        // MANAGER y USER solo pueden ver usuarios de su departamento
+        $is_admin = in_array('ROLE_ADMIN', $user->getRoles(), true);
+        $userDepartment = $user->getDepartment();
+        
+        // Determinar qué departamento buscar
+        $targetDepartmentId = $departmentId;
+        
+        // Si no es ADMIN y no proporcionó departamento o es diferente al suyo, usar el suyo
+        if (!$is_admin) {
+            if (!$userDepartment) {
+                return new JsonResponse(
+                    ['error' => 'El usuario no pertenece a ningún departamento'],
+                    Response::HTTP_FORBIDDEN
+                );
+            }
+            // Forzar que solo vea usuarios de su departamento
+            $targetDepartmentId = (string) $userDepartment->getId();
+        }
+        
+        // Obtener todos los usuarios y filtrar
+        $allUsers = $this->userService->getAllUsers();
+        
+        // Filtrar por departamento
+        $users = array_filter($allUsers, function ($u) use ($targetDepartmentId) {
+            return $u->getDepartment() && (string) $u->getDepartment()->getId() === $targetDepartmentId;
+        });
 
-        $data = array_map(function (User $user) {
+        $data = array_map(function (User $u) {
             return [
-                'id' => (string) $user->getId(),
-                'email' => $user->getEmail(),
-                'firstName' => $user->getFirstName(),
-                'lastName' => $user->getLastName(),
-                'fullName' => $user->getFullName(),
-                'active' => $user->isActive(),
+                'id' => (string) $u->getId(),
+                'email' => $u->getEmail(),
+                'firstName' => $u->getFirstName(),
+                'lastName' => $u->getLastName(),
+                'fullName' => $u->getFullName(),
+                'active' => $u->isActive(),
             ];
         }, $users);
 
-        return new JsonResponse(['users' => $data], Response::HTTP_OK);
+        return new JsonResponse(['users' => array_values($data)], Response::HTTP_OK);
     }
 }

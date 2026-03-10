@@ -5,14 +5,17 @@ declare(strict_types=1);
 namespace App\Service;
 
 use App\Entity\Department;
+use App\Entity\User;
 use App\Repository\DepartmentRepository;
 use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Bundle\SecurityBundle\Security;
 
 class DepartmentService
 {
     public function __construct(
         private DepartmentRepository $departmentRepository,
-        private EntityManagerInterface $entityManager
+        private EntityManagerInterface $entityManager,
+        private Security $security
     ) {}
 
     /**
@@ -20,7 +23,20 @@ class DepartmentService
      */
     public function getAllDepartments(): array
     {
-        return $this->departmentRepository->findAll();
+        $user = $this->security->getUser();
+        
+        // ADMIN puede ver todos los departamentos
+        if ($user instanceof User && in_array('ROLE_ADMIN', $user->getRoles(), true)) {
+            return $this->departmentRepository->findAll();
+        }
+        
+        // Los demás solo ven su propio departamento
+        $userDepartment = $user?->getDepartment();
+        if (!$userDepartment) {
+            return [];
+        }
+        
+        return [$userDepartment];
     }
 
     /**
@@ -28,12 +44,46 @@ class DepartmentService
      */
     public function getActiveDepartments(): array
     {
-        return $this->departmentRepository->findActiveDepartments();
+        $user = $this->security->getUser();
+        
+        // ADMIN puede ver todos los departamentos activos
+        if ($user instanceof User && in_array('ROLE_ADMIN', $user->getRoles(), true)) {
+            return $this->departmentRepository->findActiveDepartments();
+        }
+        
+        // Los demás solo ven su propio departamento si está activo
+        $userDepartment = $user?->getDepartment();
+        if (!$userDepartment || !$userDepartment->isActive()) {
+            return [];
+        }
+        
+        return [$userDepartment];
     }
 
     public function getDepartmentById(string $id): ?Department
     {
-        return $this->departmentRepository->find($id);
+        $department = $this->departmentRepository->find($id);
+        
+        if (!$department) {
+            return null;
+        }
+        
+        // Verificar permisos por departamento
+        $user = $this->security->getUser();
+        
+        // ADMIN puede ver todos
+        if ($user instanceof User && in_array('ROLE_ADMIN', $user->getRoles(), true)) {
+            return $department;
+        }
+        
+        // Los demás solo pueden ver su propio departamento
+        $userDepartment = $user?->getDepartment();
+        
+        if (!$userDepartment || $userDepartment !== $department) {
+            return null;
+        }
+        
+        return $department;
     }
 
     public function createDepartment(
