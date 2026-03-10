@@ -1,33 +1,43 @@
-# 🏗️ Arquitectura Sistema de Guardias
+# 🏗️ Arquitectura - Sistema de Guardias
 
 ## 📋 Descripción General
 
-Sistema de gestión de guardias para organizaciones con múltiples departamentos, usuarios, calendarización de turnos y administración de personal activo.
+Sistema de gestión de guardias para organizaciones con múltiples departamentos, usuarios, calendarización de turnos y administración de personal activo. Implementa control de acceso basado en roles y departamentos.
+
+**Estado:** ✅ **COMPLETADO Y FUNCIONANDO**
 
 ---
 
 ## 🛠️ Stack Tecnológico
 
 ### Backend
-- **Framework:** Symfony 7.x
-- **Lenguaje:** PHP 8.2+
-- **Base de Datos:** MySQL 8.0 / PostgreSQL 15
-- **ORM:** Doctrine ORM
-- **API:** RESTful API
-- **Autenticación:** JWT (LexikJWTAuthenticationBundle)
-- **Validación:** Symfony Validator
+| Tecnología | Versión | Propósito |
+|------------|---------|-----------|
+| **Framework** | Symfony 7.2 | API RESTful |
+| **Lenguaje** | PHP 8.2+ | Backend |
+| **Base de Datos** | MySQL 8.0 | Persistencia |
+| **ORM** | Doctrine ORM 3.x | Mapeo objeto-relacional |
+| **Autenticación** | LexikJWTAuthenticationBundle | JWT |
+| **Validación** | Symfony Validator | Validación de datos |
 
 ### Frontend
-- **Framework:** Vue.js 3.x (Composition API)
-- **Build Tool:** Vite
-- **UI Library:** PrimeVue / Bootstrap 5
-- **Estado:** Pinia
-- **Router:** Vue Router 4
-- **HTTP Client:** Axios
+| Tecnología | Versión | Propósito |
+|------------|---------|-----------|
+| **Framework** | Vue.js 3.x | UI con Composition API |
+| **Build Tool** | Vite 5.x | Bundler y dev server |
+| **UI Library** | PrimeVue 4.x | Componentes UI |
+| **Estado** | Pinia 2.x | State management |
+| **Router** | Vue Router 4.x | Navegación |
+| **HTTP Client** | Axios 1.6.x | Peticiones API |
+| **Calendario** | FullCalendar 6.x | Vista de calendario |
+| **Utilidades** | date-fns 3.x | Manipulación de fechas |
 
 ### DevOps
-- **Docker:** Contenedores para desarrollo
-- **Testing:** PHPUnit (Backend), Vitest (Frontend)
+| Tecnología | Versión | Propósito |
+|------------|---------|-----------|
+| **Docker** | Latest | Contenedores |
+| **Testing Backend** | PHPUnit 11.x | Tests unitarios |
+| **Testing Frontend** | Vitest 1.x | Tests frontend |
 
 ---
 
@@ -35,101 +45,66 @@ Sistema de gestión de guardias para organizaciones con múltiples departamentos
 
 ```
 guardias/
-├── backend/                    # Symfony Application
+├── backend/                    # Aplicación Symfony
 │   ├── config/
 │   │   ├── packages/
-│   │   ├── routes/
-│   │   └── bundles.php
-│   ├── migrations/             # Doctrine Migrations
-│   ├── public/
+│   │   │   ├── doctrine.yaml
+│   │   │   ├── security.yaml
+│   │   │   ├── lexik_jwt_authentication.yaml
+│   │   │   └── nelmio_cors.yaml
+│   │   └── routes.yaml
+│   ├── migrations/             # Migraciones de Doctrine
+│   ├── public/                 # Punto de entrada público
 │   ├── src/
-│   │   ├── Controller/
-│   │   │   ├── Api/
-│   │   │   │   ├── AuthController.php
-│   │   │   │   ├── DepartmentController.php
-│   │   │   │   ├── UserController.php
-│   │   │   │   ├── GuardController.php
-│   │   │   │   └── ShiftController.php
-│   │   │   └── AdminController.php
+│   │   ├── Command/
+│   │   │   └── InitRolesCommand.php
+│   │   ├── Controller/Api/
+│   │   │   ├── AuthController.php
+│   │   │   ├── DepartmentController.php
+│   │   │   ├── UserController.php
+│   │   │   ├── GuardController.php
+│   │   │   ├── AssignmentController.php
+│   │   │   └── RoleController.php
+│   │   ├── DataFixtures/       # Datos de prueba
 │   │   ├── Entity/
-│   │   │   ├── User.php
 │   │   │   ├── Department.php
+│   │   │   ├── User.php
 │   │   │   ├── Guard.php
 │   │   │   ├── Shift.php
-│   │   │   └── GuardAssignment.php
+│   │   │   ├── GuardAssignment.php
+│   │   │   ├── ShiftSwapRequest.php
+│   │   │   ├── GuardLevel.php
+│   │   │   └── Role.php
 │   │   ├── Repository/
 │   │   │   ├── UserRepository.php
 │   │   │   ├── DepartmentRepository.php
 │   │   │   ├── GuardRepository.php
 │   │   │   ├── ShiftRepository.php
-│   │   │   └── GuardAssignmentRepository.php
-│   │   ├── DTO/
-│   │   │   ├── CreateGuardDTO.php
-│   │   │   ├── AssignGuardDTO.php
-│   │   │   └── ShiftSwapDTO.php
+│   │   │   ├── GuardAssignmentRepository.php
+│   │   │   └── RoleRepository.php
+│   │   ├── Security/
+│   │   │   └── UserChecker.php
 │   │   ├── Service/
 │   │   │   ├── GuardService.php
 │   │   │   ├── ShiftService.php
 │   │   │   ├── DepartmentService.php
 │   │   │   ├── UserService.php
 │   │   │   └── CalendarService.php
-│   │   ├── EventListener/
-│   │   │   └── JwtAuthenticationListener.php
-│   │   ├── Security/
-│   │   │   └── Voter/
-│   │   │       ├── GuardVoter.php
-│   │   │       └── DepartmentVoter.php
-│   │   ├── Validator/
-│   │   │   └── Constraints/
+│   │   ├── Traits/
+│   │   │   └── CurrentUserTrait.php
 │   │   └── Kernel.php
-│   ├── templates/
 │   ├── tests/
-│   │   ├── Controller/
-│   │   ├── Entity/
-│   │   └── Service/
 │   ├── .env
-│   ├── .env.local
 │   ├── composer.json
 │   └── symfony.lock
 │
-├── frontend/                   # Vue.js Application
+├── frontend/                   # Aplicación Vue.js
 │   ├── public/
 │   ├── src/
 │   │   ├── assets/
 │   │   ├── components/
-│   │   │   ├── common/
-│   │   │   │   ├── AppHeader.vue
-│   │   │   │   ├── AppSidebar.vue
-│   │   │   │   ├── AppFooter.vue
-│   │   │   │   ├── LoadingSpinner.vue
-│   │   │   │   └── ConfirmDialog.vue
-│   │   │   ├── auth/
-│   │   │   │   └── LoginForm.vue
-│   │   │   ├── departments/
-│   │   │   │   ├── DepartmentList.vue
-│   │   │   │   ├── DepartmentForm.vue
-│   │   │   │   └── DepartmentDetail.vue
-│   │   │   ├── users/
-│   │   │   │   ├── UserList.vue
-│   │   │   │   ├── UserForm.vue
-│   │   │   │   └── UserDetail.vue
-│   │   │   ├── guards/
-│   │   │   │   ├── GuardList.vue
-│   │   │   │   ├── GuardForm.vue
-│   │   │   │   ├── GuardCalendar.vue
-│   │   │   │   └── GuardDetail.vue
-│   │   │   └── shifts/
-│   │   │       ├── ShiftList.vue
-│   │   │       ├── ShiftForm.vue
-│   │   │       └── ShiftSwapModal.vue
-│   │   ├── composables/
-│   │   │   ├── useAuth.js
-│   │   │   ├── useDepartments.js
-│   │   │   ├── useUsers.js
-│   │   │   ├── useGuards.js
-│   │   │   └── useShifts.js
+│   │   │   └── common/
 │   │   ├── layouts/
-│   │   │   ├── AuthLayout.vue
 │   │   │   └── DashboardLayout.vue
 │   │   ├── router/
 │   │   │   └── index.js
@@ -146,6 +121,10 @@ guardias/
 │   │   │   ├── user.store.js
 │   │   │   ├── guard.store.js
 │   │   │   └── shift.store.js
+│   │   ├── utils/
+│   │   │   ├── validators.js
+│   │   │   ├── formatters.js
+│   │   │   └── constants.js
 │   │   ├── views/
 │   │   │   ├── LoginView.vue
 │   │   │   ├── DashboardView.vue
@@ -154,31 +133,27 @@ guardias/
 │   │   │   ├── GuardsView.vue
 │   │   │   ├── CalendarView.vue
 │   │   │   └── SettingsView.vue
-│   │   ├── utils/
-│   │   │   ├── validators.js
-│   │   │   ├── formatters.js
-│   │   │   └── constants.js
 │   │   ├── App.vue
 │   │   └── main.js
 │   ├── index.html
 │   ├── package.json
-│   ├── vite.config.js
-│   └── tailwind.config.js
+│   └── vite.config.js
 │
-├── docker/                     # Docker Configuration
+├── docker/                     # Configuración Docker
 │   ├── docker-compose.yml
 │   ├── Dockerfile.backend
 │   ├── Dockerfile.frontend
-│   └── nginx/
-│       └── default.conf
+│   ├── nginx/default.conf
+│   ├── backup.sh
+│   ├── restore.sh
+│   └── manage_backups.sh
 │
 ├── docs/                       # Documentación
-│   ├── API.md
-│   ├── DATABASE.md
-│   └── DEPLOYMENT.md
+│   ├── ARQUITECTURA.md
+│   ├── ESTADO.md
+│   ├── INSTRUCCIONES.md
+│   └── README.md
 │
-├── .gitignore
-├── README.md
 └── ARQUITECTURA.md
 ```
 
@@ -214,11 +189,14 @@ User:
   phone: string (nullable)
   roles: array (default: ['ROLE_USER'])
   active: boolean (default: true)
-  department: ManyToOne -> Department
+  department: ManyToOne -> Department (nullable)
+  guardLevel: ManyToOne -> GuardLevel (nullable)
   createdAt: datetime
   updatedAt: datetime
   lastLogin: datetime (nullable)
   guardAssignments: OneToMany -> GuardAssignment
+  assignedGuards: OneToMany -> GuardAssignment
+  swapRequests: OneToMany -> ShiftSwapRequest
 ```
 
 #### 3. Guard (Guardia - Tipo de Servicio)
@@ -228,11 +206,14 @@ Guard:
   name: string (not null)
   code: string (unique, not null)
   description: text (nullable)
-  department: ManyToOne -> Department
+  department: ManyToOne -> Department (nullable)
   startTime: time (not null)
   endTime: time (not null)
   duration: integer (minutes, calculated)
   active: boolean (default: true)
+  validFrom: date (nullable)
+  validUntil: date (nullable)
+  weekDays: array (nullable)
   createdAt: datetime
   updatedAt: datetime
   assignments: OneToMany -> GuardAssignment
@@ -249,8 +230,6 @@ Shift:
   type: enum ['morning', 'afternoon', 'night', 'custom']
   color: string (for calendar display)
   active: boolean (default: true)
-  createdAt: datetime
-  updatedAt: datetime
 ```
 
 #### 5. GuardAssignment (Asignación de Guardia)
@@ -268,7 +247,6 @@ GuardAssignment:
   swapRequest: OneToOne -> ShiftSwapRequest (nullable)
   createdAt: datetime
   updatedAt: datetime
-  swappedAt: datetime (nullable)
 ```
 
 #### 6. ShiftSwapRequest (Solicitud de Cambio de Turno)
@@ -278,12 +256,29 @@ ShiftSwapRequest:
   originalAssignment: ManyToOne -> GuardAssignment
   newUser: ManyToOne -> User
   requestedBy: ManyToOne -> User
-  requestedAt: datetime
   status: enum ['pending', 'approved', 'rejected']
   approvedBy: ManyToOne -> User (nullable)
-  approvedAt: datetime (nullable)
   reason: text (nullable)
   rejectionReason: text (nullable)
+```
+
+#### 7. GuardLevel (Nivel de Guardia)
+```yaml
+GuardLevel:
+  id: UUID (Primary Key)
+  name: string (not null)
+  users: OneToMany -> User
+```
+
+#### 8. Role (Rol del Sistema)
+```yaml
+Role:
+  id: UUID (Primary Key)
+  name: string (unique, not null)
+  description: text (nullable)
+  active: boolean (default: true)
+  createdAt: datetime
+  updatedAt: datetime
 ```
 
 ---
@@ -292,11 +287,22 @@ ShiftSwapRequest:
 
 ### Roles de Usuario
 
-```php
-ROLE_ADMIN      // Administrador del sistema - acceso completo
-ROLE_MANAGER    // Gestor de departamento - gestión de su departamento
-ROLE_USER       // Usuario estándar - solo visualización
-```
+| Rol | Descripción | Permisos |
+|-----|-------------|----------|
+| **ROLE_ADMIN** | Administrador del sistema | Acceso completo a todas las secciones y funcionalidades |
+| **ROLE_MANAGER** | Gestor de departamento | Gestión limitada a su departamento. No puede acceder a Configuración ni Departamentos |
+| **ROLE_USER** | Usuario estándar | Solo visualización. Puede ver/editar solo registros de su departamento |
+
+### Matriz de Acceso por Sección
+
+| Sección | ADMIN | MANAGER | USER |
+|---------|-------|---------|------|
+| Dashboard | ✅ | ✅ | ✅ |
+| Departamentos | ✅ | ❌ | ❌ |
+| Usuarios | ✅ | ✅ (solo su depto) | ✅ (solo su depto) |
+| Guardias | ✅ | ✅ (solo su depto) | ✅ (solo su depto) |
+| Calendario | ✅ | ✅ | ✅ |
+| Configuración | ✅ | ❌ | ❌ |
 
 ### Endpoints de Autenticación
 
@@ -307,18 +313,23 @@ POST /api/auth/login:
   response: { token, user }
 
 POST /api/auth/logout:
-  description: Invalidar token (opcional con JWT)
+  description: Cerrar sesión
   headers: { Authorization: Bearer <token> }
 
 GET /api/auth/me:
   description: Obtener usuario autenticado
   headers: { Authorization: Bearer <token> }
-  response: { user }
+  response: { user: { id, email, firstName, lastName, roles, department, departmentName } }
 
 POST /api/auth/refresh:
   description: Refresh token
   headers: { Authorization: Bearer <token> }
   response: { token }
+
+POST /api/auth/profile/change-password:
+  description: Cambiar contraseña
+  headers: { Authorization: Bearer <token> }
+  body: { currentPassword, newPassword, confirmPassword }
 ```
 
 ---
@@ -329,50 +340,51 @@ POST /api/auth/refresh:
 
 #### Auth
 ```
-POST   /api/auth/login
-POST   /api/auth/logout
-GET    /api/auth/me
-POST   /api/auth/refresh
+POST   /api/auth/login                     # Autenticar usuario
+POST   /api/auth/logout                    # Cerrar sesión
+GET    /api/auth/me                        # Usuario autenticado
+POST   /api/auth/refresh                   # Refresh token
+POST   /api/auth/profile/change-password   # Cambiar contraseña
 ```
 
-#### Departments
+#### Departments (Solo ADMIN)
 ```
-GET    /api/departments              # Listar departamentos
-POST   /api/departments              # Crear departamento
+GET    /api/departments              # Listar departamentos (filtrado por rol)
+POST   /api/departments              # Crear departamento (ADMIN/MANAGER)
 GET    /api/departments/{id}         # Obtener departamento
-PUT    /api/departments/{id}         # Actualizar departamento
-DELETE /api/departments/{id}         # Eliminar departamento
+PUT    /api/departments/{id}         # Actualizar departamento (ADMIN/MANAGER)
+DELETE /api/departments/{id}         # Eliminar departamento (ADMIN/MANAGER)
 GET    /api/departments/{id}/users   # Obtener usuarios del departamento
 ```
 
 #### Users
 ```
-GET    /api/users                    # Listar usuarios
-POST   /api/users                    # Crear usuario
+GET    /api/users                    # Listar usuarios (filtrado por departamento)
+POST   /api/users                    # Crear usuario (ADMIN/MANAGER)
 GET    /api/users/{id}               # Obtener usuario
-PUT    /api/users/{id}               # Actualizar usuario
-DELETE /api/users/{id}               # Eliminar usuario
-GET    /api/users/{id}/guards        # Obtener guardias del usuario
+PUT    /api/users/{id}               # Actualizar usuario (ADMIN/MANAGER)
+DELETE /api/users/{id}               # Eliminar usuario (ADMIN/MANAGER)
+GET    /api/users/department/{id}    # Usuarios por departamento
 ```
 
 #### Guards
 ```
-GET    /api/guards                   # Listar guardias
-POST   /api/guards                   # Crear guardia
+GET    /api/guards                   # Listar guardias (filtrado por departamento)
+POST   /api/guards                   # Crear guardia (ADMIN/MANAGER)
 GET    /api/guards/{id}              # Obtener guardia
-PUT    /api/guards/{id}              # Actualizar guardia
-DELETE /api/guards/{id}              # Eliminar guardia
-GET    /api/guards/{id}/assignments  # Obtener asignaciones
-GET    /api/guards/active            # Obtener guardias activas
+PUT    /api/guards/{id}              # Actualizar guardia (ADMIN/MANAGER)
+DELETE /api/guards/{id}              # Eliminar guardia (ADMIN/MANAGER)
+GET    /api/guards/active            # Guardias activas
+GET    /api/guards/{id}/assignments  # Asignaciones de una guardia
 ```
 
 #### Guard Assignments
 ```
-GET    /api/assignments                      # Listar asignaciones
-POST   /api/assignments                      # Crear asignación
+GET    /api/assignments                      # Listar asignaciones (filtrado por departamento)
+POST   /api/assignments                      # Crear asignación (ADMIN/MANAGER)
 GET    /api/assignments/{id}                 # Obtener asignación
-PUT    /api/assignments/{id}                 # Actualizar asignación
-DELETE /api/assignments/{id}                 # Eliminar asignación
+PUT    /api/assignments/{id}                 # Actualizar asignación (ADMIN/MANAGER)
+DELETE /api/assignments/{id}                 # Eliminar asignación (ADMIN/MANAGER)
 GET    /api/assignments/calendar             # Calendario de guardias
 GET    /api/assignments/date/{date}          # Guardias por fecha
 GET    /api/assignments/user/{userId}        # Guardias por usuario
@@ -384,10 +396,18 @@ PUT    /api/assignments/swap/{swapId}/reject  # Rechazar cambio
 #### Shifts
 ```
 GET    /api/shifts                   # Listar turnos
-POST   /api/shifts                   # Crear turno
+POST   /api/shifts                   # Crear turno (ADMIN/MANAGER)
 GET    /api/shifts/{id}              # Obtener turno
-PUT    /api/shifts/{id}              # Actualizar turno
-DELETE /api/shifts/{id}              # Eliminar turno
+PUT    /api/shifts/{id}              # Actualizar turno (ADMIN/MANAGER)
+DELETE /api/shifts/{id}              # Eliminar turno (ADMIN/MANAGER)
+```
+
+#### Roles (Solo ADMIN/MANAGER)
+```
+GET    /api/roles                    # Listar roles
+POST   /api/roles                    # Crear rol
+PUT    /api/roles/{id}               # Actualizar rol
+DELETE /api/roles/{id}               # Eliminar rol
 ```
 
 ---
@@ -408,35 +428,14 @@ DELETE /api/shifts/{id}              # Eliminar turno
 │  │   Sidebar   │           Main Content               │ │
 │  │             │                                      │ │
 │  │  Dashboard  │  ┌────────────────────────────────┐  │ │
-│  │  Guardias   │  │  DashboardView                 │  │ │
-│  │  Usuarios   │  │  - Resumen de guardias         │  │ │
-│  │  Calendario │  │  - Próximas guardias           │  │ │
-│  │             │  │  - Estadísticas                │  │ │
-│  │             │  └────────────────────────────────┘  │ │
-│  │             │                                      │ │
-│  │             │  ┌────────────────────────────────┐  │ │
-│  │             │  │  GuardsView                    │  │ │
-│  │             │  │  - Lista de guardias           │  │ │
-│  │             │  │  - Crear/Editar guardia        │  │ │
-│  │             │  └────────────────────────────────┘  │ │
-│  │             │                                      │ │
-│  │             │  ┌────────────────────────────────┐  │ │
-│  │             │  │  CalendarView                  │  │ │
-│  │             │  │  - Calendario mensual          │  │ │
-│  │             │  │  - Días con guardia (marcados) │  │ │
-│  │             │  │  - Personal activo por día     │  │ │
-│  │             │  │  - Horas de actividad          │  │ │
-│  │             │  └────────────────────────────────┘  │ │
-│  │             │                                      │ │
-│  │             │  ┌────────────────────────────────┐  │ │
-│  │             │  │  UsersView                     │  │ │
-│  │             │  │  - Lista de usuarios           │  │ │
-│  │             │  │  - Por departamento            │  │ │
-│  │             │  └────────────────────────────────┘  │ │
-│  │             │                                      │ │
-│  │             │  ┌────────────────────────────────┐  │ │
-│  │             │  │  DepartmentsView               │  │ │
-│  │             │  │  - Lista de departamentos      │  │ │
+│  │  (ADMIN)    │  │  DashboardView                 │  │ │
+│  │  Departam.  │  │  - Resumen de guardias         │  │ │
+│  │  Usuarios   │  │  - Próximas guardias           │  │ │
+│  │  Guardias   │  │  - Estadísticas                │  │ │
+│  │  Calendario │  │                                │  │ │
+│  │  (ADMIN)    │  │  [Mensaje de Acceso Denegado]  │  │ │
+│  │  Config.    │  │  Si se intenta acceder sin     │  │ │
+│  │             │  │  permisos                      │  │ │
 │  │             │  └────────────────────────────────┘  │ │
 │  └─────────────┴──────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────┘
@@ -444,25 +443,36 @@ DELETE /api/shifts/{id}              # Eliminar turno
 
 ### Stores (Pinia)
 
+#### auth.store.js
 ```javascript
-// auth.store.js
 {
-  user: null,
-  token: null,
-  isAuthenticated: false,
+  state: {
+    user: null,
+    token: null
+  },
+  getters: {
+    isAuthenticated: Boolean,
+    isAdmin: Boolean,
+    isManager: Boolean,
+    isManagerOrAdmin: Boolean,
+    userName: String
+  },
   actions: {
-    login(credentials),
+    login(email, password),
     logout(),
     fetchUser(),
-    refreshToken()
+    changePassword(current, newPassword, confirm)
   }
 }
+```
 
-// department.store.js
+#### department.store.js
+```javascript
 {
-  departments: [],
-  currentDepartment: null,
-  loading: false,
+  state: {
+    departments: [],
+    loading: false
+  },
   actions: {
     fetchDepartments(),
     fetchDepartment(id),
@@ -471,192 +481,101 @@ DELETE /api/shifts/{id}              # Eliminar turno
     deleteDepartment(id)
   }
 }
+```
 
-// user.store.js
+#### user.store.js
+```javascript
 {
-  users: [],
-  currentUser: null,
-  loading: false,
+  state: {
+    users: [],
+    levels: [],
+    roles: [],
+    loading: false
+  },
   actions: {
-    fetchUsers(departmentId?),
-    fetchUser(id),
+    fetchUsers(),
+    fetchLevels(),
+    fetchRoles(),
     createUser(data),
     updateUser(id, data),
-    deleteUser(id)
+    deleteUser(id),
+    createLevel(name),
+    updateLevel(id, name),
+    deleteLevel(id),
+    createRole(name, description),
+    updateRole(id, name, description),
+    deleteRole(id)
   }
 }
+```
 
-// guard.store.js
+#### guard.store.js
+```javascript
 {
-  guards: [],
-  currentGuard: null,
-  activeGuards: [],
-  loading: false,
+  state: {
+    guards: [],
+    loading: false
+  },
   actions: {
     fetchGuards(),
     fetchGuard(id),
     createGuard(data),
     updateGuard(id, data),
-    deleteGuard(id),
-    fetchActiveGuards()
+    deleteGuard(id)
   }
 }
+```
 
-// shift.store.js
+#### shift.store.js
+```javascript
 {
-  shifts: [],
-  assignments: [],
-  calendarEvents: [],
-  loading: false,
+  state: {
+    shifts: [],
+    assignments: [],
+    calendarEvents: [],
+    loading: false
+  },
   actions: {
     fetchShifts(),
     fetchAssignments(filters),
     createAssignment(data),
     updateAssignment(id, data),
     deleteAssignment(id),
-    requestSwap(assignmentId, newUserId),
-    approveSwap(swapId),
-    rejectSwap(swapId),
     fetchCalendarEvents(month, year)
   }
 }
 ```
 
-### Componentes Principales
+### Sistema de Enrutamiento
 
-#### GuardCalendar.vue
-```vue
-<template>
-  <div class="calendar-container">
-    <FullCalendar :options="calendarOptions" />
-    <GuardModal v-model="showModal" :guard="selectedGuard" />
-  </div>
-</template>
+#### Guards de Navegación
 
-<script setup>
-// - Calendario mensual interactivo
-// - Marcadores visuales para días con guardia
-// - Click en día muestra personal activo
-// - Click en guardia abre modal con detalles
-// - Drag & drop para reasignar (admin)
-</script>
-```
-
-#### GuardList.vue
-```vue
-<template>
-  <div class="guard-list">
-    <DataTable :value="guards">
-      <Column field="name" header="Nombre" />
-      <Column field="department.name" header="Departamento" />
-      <Column field="startTime" header="Inicio" />
-      <Column field="endTime" header="Fin" />
-      <Column field="active" header="Estado">
-        <template #body="{ data }">
-          <Badge :severity="data.active ? 'success' : 'danger'" />
-        </template>
-      </Column>
-      <Column header="Acciones">
-        <Button icon="pi pi-edit" @click="editGuard" />
-        <Button icon="pi pi-trash" @click="deleteGuard" />
-      </Column>
-    </DataTable>
-  </div>
-</template>
-```
-
-#### ShiftSwapModal.vue
-```vue
-<template>
-  <Dialog v-model:visible="visible">
-    <h3>Solicitar Cambio de Turno</h3>
-    <Select v-model="newUser" :options="availableUsers" />
-    <Textarea v-model="reason" placeholder="Motivo del cambio" />
-    <Button @click="submitSwap">Solicitar</Button>
-  </Dialog>
-</template>
-```
-
----
-
-## 📊 Flujos de Trabajo
-
-### 1. Creación de Guardia
-
-```
-┌─────────────┐     ┌──────────────┐     ┌─────────────┐
-│  Usuario    │────▶│  Formulario  │────▶│  Servicio   │
-│  (Admin)    │     │  GuardForm   │     │  GuardService│
-└─────────────┘     └──────────────┘     └─────────────┘
-                                              │
-                                              ▼
-                                       ┌─────────────┐
-                                       │   API POST  │
-                                       │  /guards    │
-                                       └─────────────┘
-                                              │
-                                              ▼
-                                       ┌─────────────┐
-                                       │  Database   │
-                                       │  INSERT     │
-                                       └─────────────┘
-                                              │
-                                              ▼
-                                       ┌─────────────┐
-                                       │  Response   │
-                                       │  201 Created│
-                                       └─────────────┘
-```
-
-### 2. Asignación de Guardia
-
-```
-┌─────────────┐     ┌──────────────┐     ┌─────────────┐
-│  Usuario    │────▶│  Selecciona  │────▶│  Validar    │
-│  (Admin)    │     │  Usuario +   │     │  Disponibilidad│
-│             │     │  Fecha       │     │             │
-└─────────────┘     └──────────────┘     └─────────────┘
-                                              │
-                                              ▼
-                                       ┌─────────────┐
-                                       │  Crear      │
-                                       │  GuardAssignment│
-                                       └─────────────┘
-                                              │
-                                              ▼
-                                       ┌─────────────┐
-                                       │  Actualizar │
-                                       │  Calendario │
-                                       └─────────────┘
-```
-
-### 3. Cambio de Turno
-
-```
-┌─────────────┐     ┌──────────────┐     ┌─────────────┐
-│  Usuario    │────▶│  Solicita    │────▶│  Crear      │
-│             │     │  Cambio      │     │  ShiftSwap  │
-└─────────────┘     └──────────────┘     └─────────────┘
-                                              │
-                                              ▼
-                                       ┌─────────────┐
-                                       │  Notificar  │
-                                       │  a Admin    │
-                                       └─────────────┘
-                                              │
-                    ┌─────────────────────────┴──────────┐
-                    ▼                                    ▼
-             ┌─────────────┐                    ┌─────────────┐
-             │  Aprobar    │                    │  Rechazar   │
-             │  (Admin)    │                    │  (Admin)    │
-             └─────────────┘                    └─────────────┘
-                    │                                    │
-                    ▼                                    ▼
-             ┌─────────────┐                    ┌─────────────┐
-             │  Actualizar │                    │  Notificar  │
-             │  Assignment │                    │  Rechazo    │
-             │  Status     │                    │             │
-             └─────────────┘                    └─────────────┘
+```javascript
+router.beforeEach((to, from, next) => {
+  const token = localStorage.getItem('token')
+  const user = JSON.parse(localStorage.getItem('user'))
+  const isAuthenticated = !!token
+  
+  // Rutas que requieren autenticación
+  if (requiresAuth && !isAuthenticated) {
+    next('/day-shifts')
+    return
+  }
+  
+  // Rutas que requieren rol ADMIN (Departamentos, Configuración)
+  if (requiresAdmin && !user?.roles?.includes('ROLE_ADMIN')) {
+    next({ name: 'Dashboard', query: { access: 'denied' } })
+    return
+  }
+  
+  // Rutas que requieren MANAGER o ADMIN
+  if (requiresManagerOrAdmin && !(user?.roles?.includes('ROLE_ADMIN') || user?.roles?.includes('ROLE_MANAGER'))) {
+    next({ name: 'Dashboard', query: { access: 'denied' } })
+    return
+  }
+  
+  next()
+})
 ```
 
 ---
@@ -668,41 +587,195 @@ DELETE /api/shifts/{id}              # Eliminar turno
 ```php
 class GuardService
 {
-    public function createGuard(CreateGuardDTO $dto): Guard;
-    public function updateGuard(Uuid $id, CreateGuardDTO $dto): Guard;
-    public function deleteGuard(Uuid $id): void;
-    public function getActiveGuards(): array;
-    public function getGuardsByDepartment(Uuid $departmentId): array;
-    public function assignGuard(AssignGuardDTO $dto): GuardAssignment;
-    public function unassignGuard(Uuid $assignmentId): void;
+    public function __construct(
+        GuardRepository $guardRepository,
+        GuardAssignmentRepository $assignmentRepository,
+        EntityManagerInterface $entityManager,
+        Security $security
+    )
+    
+    public function getAllGuards(): array
+    // ADMIN: devuelve todas las guardias
+    // USER/MANAGER: devuelve solo guardias de su departamento
+    
+    public function getActiveGuards(): array
+    // ADMIN: devuelve todas las guardias activas
+    // USER/MANAGER: devuelve solo guardias activas de su departamento
+    
+    public function getGuardById(string $id): ?Guard
+    // Verifica permisos por departamento
+    
+    public function createGuard(...): Guard
+    // ADMIN/MANAGER pueden crear
+    // MANAGER solo en su departamento
 }
 ```
 
-### ShiftService
+### DepartmentService
 
 ```php
-class ShiftService
+class DepartmentService
 {
-    public function createShift(ShiftDTO $dto): Shift;
-    public function updateShift(Uuid $id, ShiftDTO $dto): Shift;
-    public function deleteShift(Uuid $id): void;
-    public function requestSwap(ShiftSwapDTO $dto): ShiftSwapRequest;
-    public function approveSwap(Uuid $swapId, User $approver): ShiftSwapRequest;
-    public function rejectSwap(Uuid $swapId, User $approver, string $reason): ShiftSwapRequest;
-    public function getSwapRequests(User $user): array;
+    public function getAllDepartments(): array
+    // ADMIN: devuelve todos los departamentos
+    // USER/MANAGER: devuelve solo su departamento
+    
+    public function getDepartmentById(string $id): ?Department
+    // Verifica permisos por departamento
 }
 ```
 
-### CalendarService
+### UserService
 
 ```php
-class CalendarService
+class UserService
 {
-    public function getCalendarEvents(int $month, int $year, ?Uuid $departmentId = null): array;
-    public function getGuardsByDate(\DateTimeInterface $date, ?Uuid $departmentId = null): array;
-    public function getUserGuards(Uuid $userId, \DateTimeInterface $start, \DateTimeInterface $end): array;
-    public function getActiveGuardsAtTime(\DateTimeInterface $datetime): array;
+    public function getAllUsers(): array
+    // ADMIN: devuelve todos los usuarios
+    // USER/MANAGER: devuelve solo usuarios de su departamento
+    
+    public function getUserById(string $id): ?User
+    // Verifica que el usuario pertenezca al mismo departamento
 }
+```
+
+### CurrentUserTrait
+
+```php
+trait CurrentUserTrait
+{
+    private function getCurrentUser(Security $security): ?User
+    // Obtiene el usuario autenticado
+    
+    private function getCurrentUserDepartment(Security $security): ?string
+    // Obtiene el ID del departamento del usuario
+    
+    private function isAdmin(Security $security): bool
+    // Verifica si es ADMIN
+    
+    private function isManagerOrAdmin(Security $security): bool
+    // Verifica si es MANAGER o ADMIN
+    
+    private function checkWritePermissions(): ?JsonResponse
+    // Verifica permisos de escritura (MANAGER o ADMIN)
+    
+    private function canManageDepartment(?Department $dept): ?JsonResponse
+    // Verifica si puede gestionar un departamento
+    
+    private function canManageUser(?User $user): ?JsonResponse
+    // Verifica si puede gestionar un usuario
+    
+    private function canManageGuard($guard): ?JsonResponse
+    // Verifica si puede gestionar una guardia
+}
+```
+
+---
+
+## 📊 Flujos de Trabajo
+
+### 1. Control de Acceso por Departamento
+
+```
+┌─────────────┐     ┌──────────────┐     ┌─────────────┐
+│  Usuario    │────▶│  Login       │────▶│  Obtener    │
+│  inicia     │     │              │     │  token JWT  │
+│  sesión     │     │              │     │             │
+└─────────────┘     └──────────────┘     └─────────────┘
+                                              │
+                                              ▼
+                                       ┌─────────────┐
+                                       │  Guardar    │
+                                       │  token en   │
+                                       │  localStorage│
+                                       └─────────────┘
+                                              │
+                                              ▼
+                                       ┌─────────────┐
+                                       │  Fetch User │
+                                       │  /api/auth/me│
+                                       └─────────────┘
+                                              │
+                                              ▼
+                                       ┌─────────────┐
+                                       │  Guardar    │
+                                       │  user con   │
+                                       │  department │
+                                       └─────────────┘
+```
+
+### 2. Filtrado de Datos por Departamento
+
+```
+┌─────────────┐     ┌──────────────┐     ┌─────────────┐
+│  Frontend   │────▶│  Controller  │────▶│  Service    │
+│  GET /guards│     │              │     │  (con Security)│
+└─────────────┘     └──────────────┘     └─────────────┘
+                                              │
+                    ┌─────────────────────────┴──────────┐
+                    ▼                                    ▼
+             ┌─────────────┐                    ┌─────────────┐
+             │  ADMIN      │                    │  USER/      │
+             │  Todas las  │                    │  MANAGER    │
+             │  guardias   │                    │  Solo su    │
+             │             │                    │  departamento│
+             └─────────────┘                    └─────────────┘
+```
+
+### 3. Creación de Guardia con Asignación
+
+```
+┌─────────────┐     ┌──────────────┐     ┌─────────────┐
+│  MANAGER    │────▶│  Formulario  │────▶│  Validar    │
+│  crea       │     │  GuardForm   │     │  departamento│
+│  guardia    │     │              │     │             │
+└─────────────┘     └──────────────┘     └─────────────┘
+                                              │
+                                              ▼
+                                       ┌─────────────┐
+                                       │  Verificar  │
+                                       │  permisos   │
+                                       │  (canManage)│
+                                       └─────────────┘
+                                              │
+                                              ▼
+                                       ┌─────────────┐
+                                       │  Crear      │
+                                       │  Guardia    │
+                                       └─────────────┘
+                                              │
+                                              ▼
+                                       ┌─────────────┐
+                                       │  Crear      │
+                                       │  Asignaciones│
+                                       │  (por fechas)│
+                                       └─────────────┘
+```
+
+### 4. Gestión de Roles (Solo ADMIN)
+
+```
+┌─────────────┐     ┌──────────────┐     ┌─────────────┐
+│  ADMIN      │────▶│  Settings    │────▶│  Pestaña    │
+│  accede a   │     │  View        │     │  Roles      │
+│  Config.    │     │              │     │             │
+└─────────────┘     └──────────────┘     └─────────────┘
+                                              │
+                    ┌─────────────────────────┴──────────┐
+                    ▼                                    ▼
+             ┌─────────────┐                    ┌─────────────┐
+             │  Agregar    │                    │  Editar     │
+             │  Rol        │                    │  Inline     │
+             │  (nombre +  │                    │  (click en  │
+             │  descrip.)  │                    │  lápiz)     │
+             └─────────────┘                    └─────────────┘
+                    │                                    │
+                    └────────────────┬───────────────────┘
+                                     ▼
+                              ┌─────────────┐
+                              │  POST/PUT   │
+                              │  /api/roles │
+                              └─────────────┘
 ```
 
 ---
@@ -715,95 +788,96 @@ class CalendarService
 // tests/Service/GuardServiceTest.php
 class GuardServiceTest extends TestCase
 {
-    public function testCreateGuard(): void;
-    public function testUpdateGuard(): void;
-    public function testDeleteGuard(): void;
-    public function testAssignGuard(): void;
-    public function testCannotAssignInactiveGuard(): void;
-    public function testCannotAssignOverlappingGuard(): void;
+    public function testGetAllGuardsAsAdmin(): void;
+    public function testGetAllGuardsAsUser(): void;
+    public function testCreateGuardAsManager(): void;
+    public function testCreateGuardAsUserForbidden(): void;
 }
 
-// tests/Controller/Api/GuardControllerTest.php
-class GuardControllerTest extends ApiTestCase
+// tests/Controller/Api/DepartmentControllerTest.php
+class DepartmentControllerTest extends ApiTestCase
 {
-    public function testGetGuards(): void;
-    public function testCreateGuard(): void;
-    public function testCreateGuardRequiresAdminRole(): void;
-    public function testUpdateGuard(): void;
-    public function testDeleteGuard(): void;
+    public function testGetDepartmentsAsAdmin(): void;
+    public function testGetDepartmentsAsManager(): void;
+    public function testCreateDepartmentAsUserForbidden(): void;
 }
 ```
 
 ### Frontend Tests
 
 ```javascript
-// tests/stores/guard.store.test.js
-describe('guardStore', () => {
-  it('fetches guards successfully', async () => {});
-  it('creates a new guard', async () => {});
-  it('handles fetch error', async () => {});
+// tests/stores/auth.store.test.js
+describe('authStore', () => {
+  it('login successfully', async () => {});
+  it('check isAdmin getter', () => {});
+  it('check isManagerOrAdmin getter', () => {});
 });
 
-// tests/components/GuardCalendar.test.js
-describe('GuardCalendar', () => {
-  it('renders calendar with events', () => {});
-  it('shows guard details on click', () => {});
-  it('filters by department', () => {});
+// tests/router/router.test.js
+describe('Router Guards', () => {
+  it('redirects non-admin from departments', () => {});
+  it('redirects non-admin from settings', () => {});
+  it('allows admin to access all routes', () => {});
 });
 ```
 
 ---
 
-## 🚀 Plan de Implementación
+## 🚀 Características Implementadas
 
-### Fase 1: Setup Inicial (Día 1-2)
-- [ ] Configurar proyecto Symfony
-- [ ] Configurar proyecto Vue.js
-- [ ] Configurar Docker
-- [ ] Configurar base de datos
-- [ ] Configurar JWT
+### ✅ Autenticación y Autorización
+- [x] Login con JWT
+- [x] Logout
+- [x] Obtener usuario actual
+- [x] Cambio de contraseña
+- [x] Guards de navegación por rol
 
-### Fase 2: Entidades y Migraciones (Día 3-4)
-- [ ] Crear entidades Doctrine
-- [ ] Generar migraciones
-- [ ] Crear repositories
-- [ ] Seeders de datos iniciales
+### ✅ Control de Acceso por Departamento
+- [x] Filtrado automático en servicios
+- [x] Verificación en controladores
+- [x] Trait reutilizable CurrentUserTrait
+- [x] ADMIN ve todo, USER/MANAGER ven solo su departamento
 
-### Fase 3: API Backend (Día 5-10)
-- [ ] Controller de Autenticación
-- [ ] Controller de Departamentos
-- [ ] Controller de Usuarios
-- [ ] Controller de Guardias
-- [ ] Controller de Turnos
-- [ ] Services y DTOs
-- [ ] Validadores
-- [ ] Tests unitarios
+### ✅ Gestión de Departamentos (Solo ADMIN)
+- [x] Listar departamentos
+- [x] Crear departamento
+- [x] Editar departamento
+- [x] Eliminar departamento
+- [x] Restringido a ADMIN en frontend y backend
 
-### Fase 4: Frontend Base (Día 11-15)
-- [ ] Configurar Vue Router
-- [ ] Configurar Pinia stores
-- [ ] Crear servicios API
-- [ ] Layout principal
-- [ ] Login view
-- [ ] Dashboard view
+### ✅ Gestión de Usuarios
+- [x] Listar usuarios (filtrado por departamento)
+- [x] Crear usuario (MANAGER/ADMIN)
+- [x] Editar usuario (MANAGER/ADMIN en su depto)
+- [x] Eliminar usuario (MANAGER/ADMIN en su depto)
+- [x] Asignar departamento y nivel
 
-### Fase 5: Módulos Frontend (Día 16-25)
-- [ ] Módulo de Departamentos
-- [ ] Módulo de Usuarios
-- [ ] Módulo de Guardias
-- [ ] Calendario de Guardias
-- [ ] Gestión de Cambios de Turno
+### ✅ Gestión de Guardias
+- [x] Listar guardias (filtrado por departamento)
+- [x] Crear guardia (MANAGER/ADMIN)
+- [x] Editar guardia (MANAGER/ADMIN en su depto)
+- [x] Eliminar guardia (MANAGER/ADMIN en su depto)
+- [x] Asignación automática de usuarios al crear
+- [x] Calendario de guardias
 
-### Fase 6: Testing y QA (Día 26-28)
-- [ ] Tests E2E
-- [ ] Tests de integración
-- [ ] Bug fixing
-- [ ] Optimización
+### ✅ Gestión de Roles (Solo ADMIN)
+- [x] Listar roles en Configuración
+- [x] Crear nuevo rol
+- [x] Editar rol inline
+- [x] Eliminar rol (si no está en uso)
+- [x] Dropdown de roles en Usuarios
 
-### Fase 7: Deploy (Día 29-30)
-- [ ] Configurar producción
-- [ ] Deploy
-- [ ] Monitoreo
+### ✅ Configuración (Solo ADMIN)
+- [x] Pestaña Perfil y Seguridad
+- [x] Cambio de contraseña
+- [x] Pestaña Niveles de Usuario
+- [x] Pestaña Roles del Sistema
+
+### ✅ Backup y Restauración
+- [x] Script de backup completo
+- [x] Script de restauración
+- [x] Script de gestión de backups
+- [x] Documentación de backups
 
 ---
 
@@ -815,15 +889,16 @@ describe('GuardCalendar', () => {
   "require": {
     "symfony/framework-bundle": "^7.0",
     "symfony/security-bundle": "^7.0",
-    "doctrine/orm": "^2.17",
+    "doctrine/orm": "^3.0",
     "lexik/jwt-authentication-bundle": "^2.19",
     "symfony/validator": "^7.0",
-    "nelmio/cors-bundle": "^2.4"
+    "nelmio/cors-bundle": "^2.4",
+    "symfony/uid": "^7.0"
   },
   "require-dev": {
-    "phpunit/phpunit": "^10.0",
+    "phpunit/phpunit": "^11.0",
     "symfony/maker-bundle": "^1.52",
-    "dama/doctrine-test-bundle": "^8.0"
+    "doctrine/doctrine-fixtures-bundle": "^3.5"
   }
 }
 ```
@@ -836,15 +911,14 @@ describe('GuardCalendar', () => {
     "vue-router": "^4.2",
     "pinia": "^2.1",
     "axios": "^1.6",
-    "primevue": "^3.47",
+    "primevue": "^4.0",
     "@fullcalendar/vue3": "^6.1",
     "date-fns": "^3.0"
   },
   "devDependencies": {
     "vite": "^5.0",
     "@vitejs/plugin-vue": "^5.0",
-    "vitest": "^1.0",
-    "@vue/test-utils": "^2.4"
+    "vitest": "^1.0"
   }
 }
 ```
@@ -882,80 +956,62 @@ security:
 
   access_control:
     - { path: ^/api/auth/login, roles: PUBLIC_ACCESS }
+    - { path: ^/api/auth/refresh, roles: PUBLIC_ACCESS }
     - { path: ^/api, roles: IS_AUTHENTICATED_FULLY }
+```
+
+### Validación de Permisos
+
+```php
+// En controladores
+#[IsGranted('IS_AUTHENTICATED_FULLY')]
+class DepartmentController extends AbstractController
+{
+    use CurrentUserTrait;
+    
+    #[Route('', methods: ['POST'])]
+    public function create(): JsonResponse
+    {
+        $error = $this->checkWritePermissions();
+        if ($error) {
+            return $error; // 403 Forbidden
+        }
+        
+        // Solo ADMIN puede crear departamentos
+        if (!$this->isAdmin($this->security)) {
+            return new JsonResponse(
+                ['error' => 'Solo ADMIN puede crear departamentos'],
+                Response::HTTP_FORBIDDEN
+            );
+        }
+    }
+}
 ```
 
 ---
 
-## 📈 Métricas y Monitoreo
+## 📊 URLs y Puertos
 
-### Dashboard Metrics
-- Total de guardias activas
-- Guardias por departamento
-- Usuarios activos
-- Cambios de turno pendientes
-- Guardias completadas este mes
-
-### Logs y Auditoría
-- Logs de autenticación
-- Logs de cambios en guardias
-- Logs de solicitudes de cambio
-- Auditoría de acciones de administradores
+| Servicio | URL | Puerto |
+|----------|-----|--------|
+| Frontend | http://localhost:5173 | 5173 |
+| Backend API | http://localhost:8000 | 8000 |
+| phpMyAdmin | http://localhost:18080 | 18080 |
+| MySQL | localhost | 13306 |
 
 ---
 
-## 📝 Convenciones de Código
+## 📝 Credenciales de Prueba
 
-### Backend (PHP)
-- PSR-12 coding standards
-- Type hints obligatorios
-- PHPDoc en métodos públicos
-- Tests por cada service/controller
-
-### Frontend (Vue.js)
-- Composition API con `<script setup>`
-- Nombres de componentes en PascalCase
-- Props con validación de tipos
-- Tests de componentes críticos
+| Email | Password | Rol | Departamento |
+|-------|----------|-----|--------------|
+| `admin@example.com` | `admin123` | ADMIN | Tecnología |
+| `manager@example.com` | `manager123` | MANAGER | Operaciones |
+| `tech_user1@example.com` | `user123` | USER | Tecnología |
+| `ops_user1@example.com` | `user123` | USER | Operaciones |
+| `hr_user1@example.com` | `user123` | USER | Recursos Humanos |
 
 ---
 
-## 🎯 Criterios de Aceptación
-
-### Funcionales
-- ✅ CRUD completo de departamentos
-- ✅ CRUD completo de usuarios
-- ✅ CRUD completo de guardias
-- ✅ Asignación de guardias a usuarios
-- ✅ Calendario con visualización mensual
-- ✅ Días marcados con personal de guardia
-- ✅ Visualización de horas activas por guardia
-- ✅ Sistema de cambio de turnos
-- ✅ Login de administradores
-- ✅ Filtrado por departamento
-
-### No Funcionales
-- ✅ Tiempo de respuesta < 200ms
-- ✅ Soporte para 100+ usuarios concurrentes
-- ✅ Responsive design
-- ✅ Tests con cobertura > 80%
-- ✅ Documentación API completa
-
----
-
-## 📞 Soporte y Mantenimiento
-
-### Issues Comunes
-1. **Problemas de autenticación:** Verificar expiración de JWT
-2. **Conflictos de horario:** Validar solapamientos antes de asignar
-3. **Rendimiento de calendario:** Implementar paginación de eventos
-
-### Backup y Recovery
-- Backup diario de base de datos
-- Retención de 30 días
-- Scripts de recovery automatizados
-
----
-
-*Documento creado para guiar el desarrollo del Sistema de Guardias*
-*Versión: 1.0 | Fecha: 2026-03-03*
+*Documento generado para el Sistema de Guardias*
+*Última actualización: 2026-03-10*

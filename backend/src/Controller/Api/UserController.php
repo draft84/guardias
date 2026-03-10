@@ -6,6 +6,7 @@ namespace App\Controller\Api;
 
 use App\Entity\User;
 use App\Service\UserService;
+use App\Service\UserImportExportService;
 use App\Traits\CurrentUserTrait;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -31,7 +32,8 @@ class UserController extends AbstractController
         private EntityManagerInterface $entityManager,
         private UserPasswordHasherInterface $passwordHasher,
         private ValidatorInterface $validator,
-        private PhoneNumberUtil $phoneNumberUtil
+        private PhoneNumberUtil $phoneNumberUtil,
+        private UserImportExportService $importExportService
     ) {
     }
 
@@ -109,15 +111,120 @@ class UserController extends AbstractController
         return new JsonResponse(['users' => $data], Response::HTTP_OK);
     }
 
+    /**
+     * Descargar plantilla Excel para carga masiva
+     */
+    #[Route('/export-template', name: 'api_users_export_template', methods: ['GET'])]
+    public function downloadTemplate(): Response
+    {
+        $content = $this->importExportService->createTemplate();
+        
+        // Guardar en directorio público para descarga directa
+        $templatePath = $this->getParameter('kernel.project_dir') . '/public/templates/plantilla_usuarios.xlsx';
+        
+        // Crear directorio si no existe
+        $dir = dirname($templatePath);
+        if (!file_exists($dir)) {
+            mkdir($dir, 0755, true);
+        }
+        
+        // Guardar archivo
+        file_put_contents($templatePath, $content);
+
+        return new Response($content, Response::HTTP_OK, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition' => 'attachment; filename="plantilla_usuarios.xlsx"'
+        ]);
+    }
+
+    /**
+     * Exportar usuarios a Excel
+     */
+    #[Route('/export', name: 'api_users_export', methods: ['GET'])]
+    public function exportUsers(): Response
+    {
+        // Verificar permisos - solo ADMIN o MANAGER pueden exportar
+        $error = $this->checkWritePermissions();
+        if ($error) {
+            return $error;
+        }
+
+        $users = $this->userService->getAllUsers();
+        $content = $this->importExportService->exportUsers($users);
+
+        return new Response($content, Response::HTTP_OK, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition' => 'attachment; filename="usuarios_export_' . date('Y-m-d') . '.xlsx"'
+        ]);
+    }
+
+    /**
+     * Importar usuarios desde Excel
+     */
+    #[Route('/import', name: 'api_users_import', methods: ['POST'])]
+    public function importUsers(Request $request): JsonResponse
+    {
+        // Verificar permisos - solo ADMIN o MANAGER pueden importar
+        $error = $this->checkWritePermissions();
+        if ($error) {
+            return $error;
+        }
+
+        $files = $request->files->all();
+        
+        if (!isset($files['file'])) {
+            return new JsonResponse([
+                'error' => 'No se encontró el archivo'
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        $file = $files['file'];
+
+        // Validar tipo de archivo
+        $allowedTypes = [
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'application/vnd.ms-excel'
+        ];
+
+        if (!in_array($file->getMimeType(), $allowedTypes)) {
+            return new JsonResponse([
+                'error' => 'El archivo debe ser un Excel (.xlsx o .xls)'
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        try {
+            $result = $this->importExportService->importUsers($file, '');
+
+            if ($result['success'] === 0 && count($result['errors']) > 0) {
+                return new JsonResponse([
+                    'error' => 'No se pudo importar ningún usuario',
+                    'details' => $result['errors']
+                ], Response::HTTP_BAD_REQUEST);
+            }
+
+            return new JsonResponse([
+                'message' => 'Importación completada',
+                'success' => $result['success'],
+                'total' => $result['total'],
+                'errors' => $result['errors']
+            ], Response::HTTP_OK);
+
+        } catch (\Exception $e) {
+            return new JsonResponse([
+                'error' => 'Error al importar: ' . $e->getMessage()
+            ], Response::HTTP_BAD_REQUEST);
+        }
+    }
+
     #[Route('/{id}', name: 'api_users_get', methods: ['GET'])]
     public function get(string $id): JsonResponse
     {
         $user = $this->userService->getUserById($id);
-        
+
         if (!$user) {
             return new JsonResponse(['error' => 'User not found or access denied'], Response::HTTP_NOT_FOUND);
         }
-        
+
         $data = [
             'id' => (string) $user->getId(),
             'email' => $user->getEmail(),

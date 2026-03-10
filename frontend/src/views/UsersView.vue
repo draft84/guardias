@@ -6,8 +6,105 @@
         <i class="pi pi-users text-3xl text-primary"></i>
         <h2 class="text-2xl font-bold m-0">Usuarios</h2>
       </div>
-      <Button label="Nuevo Usuario" icon="pi pi-plus" @click="openNewUser()" />
+      <div class="flex gap-2">
+        <Button 
+          label="Exportar" 
+          icon="pi pi-download" 
+          severity="secondary" 
+          outlined 
+          @click="exportUsers" 
+          v-tooltip.top="'Exportar usuarios a Excel'"
+        />
+        <Button 
+          label="Importar" 
+          icon="pi pi-upload" 
+          severity="secondary" 
+          outlined 
+          @click="showImportDialog" 
+          v-tooltip.top="'Importar usuarios desde Excel'"
+        />
+        <Button label="Nuevo Usuario" icon="pi pi-plus" @click="openNewUser()" />
+      </div>
     </div>
+
+    <!-- Dialog de Importación -->
+    <Dialog 
+      v-model:visible="importDialog" 
+      :style="{width: '500px'}" 
+      header="Importar Usuarios desde Excel" 
+      :modal="true"
+    >
+      <div class="flex flex-column gap-4 py-4">
+        <Message severity="info" :closable="false">
+          <div class="flex flex-column gap-2">
+            <p class="m-0 font-bold">Instrucciones:</p>
+            <ul class="m-0 pl-4">
+              <li>Descarga la plantilla oficial para conocer el formato requerido</li>
+              <li>Completa los datos de los usuarios en el archivo Excel</li>
+              <li>Los campos requeridos son: Email, Password, FirstName, LastName, Department Code</li>
+              <li>Sube el archivo completado para importar los usuarios</li>
+            </ul>
+          </div>
+        </Message>
+
+        <div class="flex gap-2 justify-content-center">
+          <Button 
+            label="Descargar Plantilla" 
+            icon="pi pi-file-excel" 
+            severity="success" 
+            outlined 
+            @click="downloadTemplate"
+            class="flex-1"
+          />
+        </div>
+
+        <div class="field">
+          <label for="excelFile" class="font-bold block mb-2">Archivo Excel *</label>
+          <input 
+            type="file" 
+            id="excelFile" 
+            accept=".xlsx,.xls" 
+            @change="onFileSelect" 
+            class="w-full"
+          />
+          <small class="p-error block mt-1" v-if="selectedFile && !isValidFileType">
+            El archivo debe ser un Excel (.xlsx o .xls)
+          </small>
+        </div>
+
+        <div v-if="importResult" class="mt-3">
+          <Message 
+            :severity="importResult.success > 0 ? 'success' : 'error'" 
+            :closable="false"
+          >
+            <div class="flex flex-column gap-2">
+              <p class="m-0 font-bold">
+                {{ importResult.success }} de {{ importResult.total }} usuarios importados
+              </p>
+              <div v-if="importResult.errors && importResult.errors.length > 0">
+                <p class="m-0 text-sm">Errores encontrados:</p>
+                <ul class="m-0 pl-4 text-sm">
+                  <li v-for="(err, idx) in importResult.errors" :key="idx">
+                    Fila {{ err.row }}: {{ err.error }}
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </Message>
+        </div>
+      </div>
+
+      <template #footer>
+        <Button label="Cancelar" icon="pi pi-times" text @click="hideImportDialog"/>
+        <Button 
+          label="Importar" 
+          icon="pi pi-upload" 
+          :loading="importing" 
+          @click="importUsers" 
+          :disabled="!selectedFile"
+        />
+      </template>
+    </Dialog>
 
       <Message v-if="userStore.error" severity="error" :closable="false" class="mb-4">{{ userStore.error }}</Message>
 
@@ -279,6 +376,21 @@ const filters = ref({
     departmentName: { value: null, matchMode: FilterMatchMode.CONTAINS },
 })
 
+// Variables para importación
+const importDialog = ref(false)
+const selectedFile = ref(null)
+const importing = ref(false)
+const importResult = ref(null)
+
+const isValidFileType = computed(() => {
+  if (!selectedFile.value) return true
+  const validTypes = [
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.ms-excel'
+  ]
+  return validTypes.includes(selectedFile.value.type)
+})
+
 const formData = reactive({
   firstName: '',
   lastName: '',
@@ -444,6 +556,201 @@ const saveUser = async () => {
     toast.add({ severity: 'error', summary: 'Error', detail: error.message, life: 3000 })
   } finally {
     saving.value = false
+  }
+}
+
+// Funciones de Importación/Exportación
+const API_URL = 'http://localhost:8000'
+
+const downloadTemplate = async () => {
+  try {
+    const token = localStorage.getItem('token')
+    console.log('Downloading template with token:', token ? 'Token presente' : 'Token NO presente')
+    
+    const response = await fetch(`${API_URL}/api/users/export-template`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    })
+
+    console.log('Response status:', response.status)
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      console.error('Error response:', errorData)
+      throw new Error(errorData.message || 'Error al descargar la plantilla')
+    }
+
+    const blob = await response.blob()
+    console.log('Blob received:', blob.size, 'bytes')
+    
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'plantilla_usuarios.xlsx'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+    
+    toast.add({
+      severity: 'success',
+      summary: 'Éxito',
+      detail: 'Plantilla descargada correctamente',
+      life: 3000
+    })
+  } catch (error) {
+    console.error('Error downloading template:', error)
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: error.message || 'No se pudo descargar la plantilla',
+      life: 5000
+    })
+  }
+}
+
+const exportUsers = async () => {
+  try {
+    const token = localStorage.getItem('token')
+    console.log('Exporting users with token:', token ? 'Token presente' : 'Token NO presente')
+    
+    const response = await fetch(`${API_URL}/api/users/export`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    })
+
+    console.log('Response status:', response.status)
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      console.error('Error response:', errorData)
+      throw new Error(errorData.message || 'Error al exportar usuarios')
+    }
+
+    const blob = await response.blob()
+    console.log('Blob received:', blob.size, 'bytes')
+    
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `usuarios_export_${new Date().toISOString().split('T')[0]}.xlsx`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+    
+    toast.add({
+      severity: 'success',
+      summary: 'Éxito',
+      detail: 'Usuarios exportados correctamente',
+      life: 3000
+    })
+  } catch (error) {
+    console.error('Error exporting users:', error)
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: error.message || 'No se pudieron exportar los usuarios',
+      life: 5000
+    })
+  }
+}
+
+const showImportDialog = () => {
+  importDialog.value = true
+  selectedFile.value = null
+  importResult.value = null
+}
+
+const hideImportDialog = () => {
+  importDialog.value = false
+  selectedFile.value = null
+  importResult.value = null
+}
+
+const onFileSelect = (event) => {
+  const file = event.target.files[0]
+  if (file) {
+    selectedFile.value = file
+  }
+}
+
+const importUsers = async () => {
+  if (!selectedFile.value) {
+    console.error('No hay archivo seleccionado')
+    return
+  }
+
+  console.log('Archivo seleccionado:', selectedFile.value.name, 'Tipo:', selectedFile.value.type, 'Tamaño:', selectedFile.value.size)
+
+  importing.value = true
+  importResult.value = null
+
+  try {
+    const token = localStorage.getItem('token')
+    const formDataObj = new FormData()
+    formDataObj.append('file', selectedFile.value)
+
+    console.log('Enviando petición a:', `${API_URL}/api/users/import`)
+
+    const response = await fetch(`${API_URL}/api/users/import`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
+      body: formDataObj
+    })
+
+    console.log('Respuesta status:', response.status)
+    const data = await response.json()
+    console.log('Respuesta data:', data)
+
+    if (!response.ok) {
+      throw new Error(data.error || 'Error al importar usuarios')
+    }
+
+    importResult.value = data
+
+    if (data.success > 0) {
+      toast.add({
+        severity: 'success',
+        summary: 'Importación completada',
+        detail: `${data.success} de ${data.total} usuarios importados`,
+        life: 5000
+      })
+
+      // Recargar lista de usuarios
+      await userStore.fetchUsers()
+
+      // Cerrar dialog después de un momento
+      setTimeout(() => {
+        hideImportDialog()
+      }, 3000)
+    } else {
+      toast.add({
+        severity: 'error',
+        summary: 'Importación fallida',
+        detail: data.details ? JSON.stringify(data.details) : 'No se pudo importar ningún usuario',
+        life: 8000
+      })
+    }
+
+  } catch (error) {
+    console.error('Error importing users:', error)
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: error.message,
+      life: 5000
+    })
+  } finally {
+    importing.value = false
   }
 }
 

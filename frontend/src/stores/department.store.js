@@ -77,10 +77,75 @@ export const useDepartmentStore = defineStore('department', {
           'Authorization': `Bearer ${token}`
         }
       })
-      
+
       if (!response.ok) throw new Error('Error al eliminar')
-      
+
       await this.fetchDepartments()
+    },
+
+    async downloadTemplate() {
+      const token = localStorage.getItem('token')
+      const response = await fetch(`${API_URL}/api/departments/export-template`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+
+      if (!response.ok) throw new Error('Error al descargar plantilla')
+
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = 'plantilla_departamentos.xlsx'
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+    },
+
+    async exportDepartments() {
+      const token = localStorage.getItem('token')
+      const response = await fetch(`${API_URL}/api/departments/export`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+
+      if (!response.ok) throw new Error('Error al exportar departamentos')
+
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `departamentos_export_${new Date().toISOString().split('T')[0]}.xlsx`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+    },
+
+    async importDepartments(file) {
+      const token = localStorage.getItem('token')
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const response = await fetch(`${API_URL}/api/departments/import`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Error al importar departamentos')
+      }
+
+      await this.fetchDepartments()
+      return data
     }
   }
 })

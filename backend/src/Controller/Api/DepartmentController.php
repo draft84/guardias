@@ -66,6 +66,104 @@ class DepartmentController extends AbstractController
         return new JsonResponse(['departments' => $data], Response::HTTP_OK);
     }
 
+    /**
+     * Descargar plantilla Excel para carga masiva
+     */
+    #[Route('/export-template', name: 'api_departments_export_template', methods: ['GET'])]
+    public function downloadTemplate(): Response
+    {
+        $content = $this->departmentService->createTemplate();
+
+        return new Response($content, Response::HTTP_OK, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition' => 'attachment; filename="plantilla_departamentos.xlsx"'
+        ]);
+    }
+
+    /**
+     * Exportar departamentos a Excel
+     */
+    #[Route('/export', name: 'api_departments_export', methods: ['GET'])]
+    public function exportDepartments(): Response
+    {
+        // Verificar permisos - solo ADMIN puede exportar
+        $user = $this->getUser();
+        if (!$user instanceof User || !in_array('ROLE_ADMIN', $user->getRoles(), true)) {
+            return new JsonResponse(
+                ['error' => 'Acceso denegado. Solo ADMIN puede exportar departamentos'],
+                Response::HTTP_FORBIDDEN
+            );
+        }
+
+        $content = $this->departmentService->exportDepartments();
+
+        return new Response($content, Response::HTTP_OK, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition' => 'attachment; filename="departamentos_export_' . date('Y-m-d') . '.xlsx"'
+        ]);
+    }
+
+    /**
+     * Importar departamentos desde Excel
+     */
+    #[Route('/import', name: 'api_departments_import', methods: ['POST'])]
+    public function importDepartments(Request $request): JsonResponse
+    {
+        // Verificar permisos - solo ADMIN puede importar
+        $user = $this->getUser();
+        if (!$user instanceof User || !in_array('ROLE_ADMIN', $user->getRoles(), true)) {
+            return new JsonResponse(
+                ['error' => 'Acceso denegado. Solo ADMIN puede importar departamentos'],
+                Response::HTTP_FORBIDDEN
+            );
+        }
+
+        $files = $request->files->all();
+
+        if (!isset($files['file'])) {
+            return new JsonResponse([
+                'error' => 'No se encontró el archivo'
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        $file = $files['file'];
+
+        // Validar tipo de archivo
+        $allowedTypes = [
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'application/vnd.ms-excel'
+        ];
+
+        if (!in_array($file->getMimeType(), $allowedTypes)) {
+            return new JsonResponse([
+                'error' => 'El archivo debe ser un Excel (.xlsx o .xls)'
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        try {
+            $result = $this->departmentService->importDepartments($file);
+
+            if ($result['success'] === 0 && count($result['errors']) > 0) {
+                return new JsonResponse([
+                    'error' => 'No se pudo importar ningún departamento',
+                    'details' => $result['errors']
+                ], Response::HTTP_BAD_REQUEST);
+            }
+
+            return new JsonResponse([
+                'message' => 'Importación completada',
+                'success' => $result['success'],
+                'total' => $result['total'],
+                'errors' => $result['errors']
+            ], Response::HTTP_OK);
+
+        } catch (\Exception $e) {
+            return new JsonResponse([
+                'error' => 'Error al importar: ' . $e->getMessage()
+            ], Response::HTTP_BAD_REQUEST);
+        }
+    }
+
     #[Route('/{id}', name: 'api_departments_get', methods: ['GET'])]
     public function get(string $id): JsonResponse
     {

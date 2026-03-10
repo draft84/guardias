@@ -7,8 +7,105 @@
         <i class="pi pi-building text-3xl text-primary"></i>
         <h2 class="text-2xl font-bold m-0">Departamentos</h2>
       </div>
-      <Button label="Nuevo Departamento" icon="pi pi-plus" @click="openNewDepartment" />
+      <div class="flex gap-2">
+        <Button 
+          label="Exportar" 
+          icon="pi pi-download" 
+          severity="secondary" 
+          outlined 
+          @click="exportDepartments" 
+          v-tooltip.top="'Exportar departamentos a Excel'"
+        />
+        <Button 
+          label="Importar" 
+          icon="pi pi-upload" 
+          severity="secondary" 
+          outlined 
+          @click="showImportDialog" 
+          v-tooltip.top="'Importar departamentos desde Excel'"
+        />
+        <Button label="Nuevo Departamento" icon="pi pi-plus" @click="openNewDepartment" />
+      </div>
     </div>
+
+    <!-- Dialog de Importación -->
+    <Dialog 
+      v-model:visible="importDialog" 
+      :style="{width: '500px'}" 
+      header="Importar Departamentos desde Excel" 
+      :modal="true"
+    >
+      <div class="flex flex-column gap-4 py-4">
+        <Message severity="info" :closable="false">
+          <div class="flex flex-column gap-2">
+            <p class="m-0 font-bold">Instrucciones:</p>
+            <ul class="m-0 pl-4">
+              <li>Descarga la plantilla oficial para conocer el formato requerido</li>
+              <li>Completa los datos de los departamentos en el archivo Excel</li>
+              <li>Los campos requeridos son: Name, Code</li>
+              <li>Sube el archivo completado para importar los departamentos</li>
+            </ul>
+          </div>
+        </Message>
+
+        <div class="flex gap-2 justify-content-center">
+          <Button 
+            label="Descargar Plantilla" 
+            icon="pi pi-file-excel" 
+            severity="success" 
+            outlined 
+            @click="downloadTemplate"
+            class="flex-1"
+          />
+        </div>
+
+        <div class="field">
+          <label for="excelFile" class="font-bold block mb-2">Archivo Excel *</label>
+          <input 
+            type="file" 
+            id="excelFile" 
+            accept=".xlsx,.xls" 
+            @change="onFileSelect" 
+            class="w-full"
+          />
+          <small class="p-error block mt-1" v-if="selectedFile && !isValidFileType">
+            El archivo debe ser un Excel (.xlsx o .xls)
+          </small>
+        </div>
+
+        <div v-if="importResult" class="mt-3">
+          <Message 
+            :severity="importResult.success > 0 ? 'success' : 'error'" 
+            :closable="false"
+          >
+            <div class="flex flex-column gap-2">
+              <p class="m-0 font-bold">
+                {{ importResult.success }} de {{ importResult.total }} departamentos importados
+              </p>
+              <div v-if="importResult.errors && importResult.errors.length > 0">
+                <p class="m-0 text-sm">Errores encontrados:</p>
+                <ul class="m-0 pl-4 text-sm">
+                  <li v-for="(err, idx) in importResult.errors" :key="idx">
+                    Fila {{ err.row }}: {{ err.error }}
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </Message>
+        </div>
+      </div>
+
+      <template #footer>
+        <Button label="Cancelar" icon="pi pi-times" text @click="hideImportDialog"/>
+        <Button 
+          label="Importar" 
+          icon="pi pi-upload" 
+          :loading="importing" 
+          @click="importDepartments" 
+          :disabled="!selectedFile"
+        />
+      </template>
+    </Dialog>
 
     <!-- DataTable -->
     <DataTable
@@ -100,7 +197,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { FilterMatchMode } from '@primevue/core/api'
 import { useConfirm } from 'primevue/useconfirm'
 import { useToast } from 'primevue/usetoast'
@@ -115,6 +212,7 @@ import Checkbox from 'primevue/checkbox'
 import Textarea from 'primevue/textarea'
 import IconField from 'primevue/iconfield'
 import InputIcon from 'primevue/inputicon'
+import Message from 'primevue/message'
 
 const departmentStore = useDepartmentStore()
 const confirm = useConfirm()
@@ -124,6 +222,21 @@ const departmentDialog = ref(false)
 const editingDepartment = ref(null)
 const submitted = ref(false)
 const saving = ref(false)
+
+// Variables para importación
+const importDialog = ref(false)
+const selectedFile = ref(null)
+const importing = ref(false)
+const importResult = ref(null)
+
+const isValidFileType = computed(() => {
+  if (!selectedFile.value) return true
+  const validTypes = [
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.ms-excel'
+  ]
+  return validTypes.includes(selectedFile.value.type)
+})
 
 const filters = ref({
   global: { value: null, matchMode: FilterMatchMode.CONTAINS }
@@ -196,6 +309,117 @@ const saveDepartment = async () => {
     toast.add({ severity: 'error', summary: 'Error', detail: error.message, life: 3000 })
   } finally {
     saving.value = false
+  }
+}
+
+// Funciones de Importación/Exportación
+const downloadTemplate = async () => {
+  try {
+    await departmentStore.downloadTemplate()
+    toast.add({
+      severity: 'success',
+      summary: 'Éxito',
+      detail: 'Plantilla descargada correctamente',
+      life: 3000
+    })
+  } catch (error) {
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: error.message,
+      life: 3000
+    })
+  }
+}
+
+const exportDepartments = async () => {
+  try {
+    await departmentStore.exportDepartments()
+    toast.add({
+      severity: 'success',
+      summary: 'Éxito',
+      detail: 'Departamentos exportados correctamente',
+      life: 3000
+    })
+  } catch (error) {
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: error.message,
+      life: 3000
+    })
+  }
+}
+
+const showImportDialog = () => {
+  importDialog.value = true
+  selectedFile.value = null
+  importResult.value = null
+}
+
+const hideImportDialog = () => {
+  importDialog.value = false
+  selectedFile.value = null
+  importResult.value = null
+}
+
+const onFileSelect = (event) => {
+  const file = event.target.files[0]
+  if (file) {
+    selectedFile.value = file
+  }
+}
+
+const importDepartments = async () => {
+  if (!selectedFile.value) {
+    console.error('No hay archivo seleccionado')
+    return
+  }
+
+  console.log('Archivo seleccionado:', selectedFile.value.name, 'Tipo:', selectedFile.value.type, 'Tamaño:', selectedFile.value.size)
+
+  importing.value = true
+  importResult.value = null
+
+  try {
+    const data = await departmentStore.importDepartments(selectedFile.value)
+    console.log('Respuesta:', data)
+    importResult.value = data
+
+    if (data.success > 0) {
+      toast.add({
+        severity: 'success',
+        summary: 'Importación completada',
+        detail: `${data.success} de ${data.total} departamentos importados`,
+        life: 5000
+      })
+
+      // Recargar lista de departamentos
+      await departmentStore.fetchDepartments()
+
+      // Cerrar dialog después de un momento
+      setTimeout(() => {
+        hideImportDialog()
+      }, 3000)
+    } else {
+      toast.add({
+        severity: 'error',
+        summary: 'Importación fallida',
+        detail: data.details ? JSON.stringify(data.details) : 'No se pudo importar ningún departamento',
+        life: 8000
+      })
+    }
+
+  } catch (error) {
+    console.error('Error importing departments:', error)
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: error.message,
+      life: 5000
+    })
+  } finally {
+    importing.value = false
   }
 }
 
