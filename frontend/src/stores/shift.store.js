@@ -26,6 +26,28 @@ export const useShiftStore = defineStore('shift', {
       }
     },
 
+    async fetchAssignments(month, year) {
+      this.loading = true
+      try {
+        const token = localStorage.getItem('token')
+        const params = new URLSearchParams()
+        if (month) params.append('month', month)
+        if (year) params.append('year', year)
+        
+        const response = await fetch(`${API_URL}/api/assignments/calendar?${params.toString()}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
+        if (!response.ok) throw new Error('Error')
+        const data = await response.json()
+        this.assignments = data.events || []
+        console.log('📅 [ShiftStore] Assignments loaded:', this.assignments.length)
+      } catch (error) {
+        console.error('❌ [ShiftStore] Error loading assignments:', error)
+      } finally {
+        this.loading = false
+      }
+    },
+
     async createShift(shift) {
       const token = localStorage.getItem('token')
       const response = await fetch(`${API_URL}/api/shifts`, {

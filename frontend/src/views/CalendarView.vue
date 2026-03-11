@@ -111,10 +111,10 @@
     </Dialog>
 
     <!-- Dialog de Sustitución -->
-    <Dialog 
-      v-model:visible="substituteDialog" 
-      :style="{width: '600px'}" 
-      header="Solicitar Sustitución de Guardia" 
+    <Dialog
+      v-model:visible="substituteDialog"
+      :style="{width: '700px'}"
+      header="Solicitar Sustitución de Guardia"
       :modal="true"
     >
       <div class="flex flex-column gap-4 py-4">
@@ -133,13 +133,133 @@
             </div>
             <div class="flex justify-content-between">
               <span class="text-color-secondary">Fecha:</span>
-              <span class="font-semibold">{{ selectedAssignment?.date }}</span>
+              <span class="font-semibold">{{ formatDate(selectedAssignment?.date) }}</span>
             </div>
             <div class="flex justify-content-between">
               <span class="text-color-secondary">Horario:</span>
               <span class="font-semibold">{{ selectedAssignment?.startTime }} - {{ selectedAssignment?.endTime }}</span>
             </div>
           </div>
+        </div>
+
+        <!-- Selector de rango de fechas -->
+        <div class="field">
+          <label class="font-bold block mb-2">Rango de fechas para buscar asignaciones:</label>
+          <div class="flex gap-2 align-items-center">
+            <Calendar 
+              v-model="dateRange" 
+              selectionMode="range" 
+              :manualInput="true"
+              :showIcon="true"
+              dateFormat="dd/mm/yy"
+              placeholder="Selecciona inicio - fin"
+              class="flex-1"
+              @date-select="onDateRangeChange"
+            />
+            <Button 
+              icon="pi pi-refresh" 
+              text 
+              rounded 
+              @click="resetDateRange"
+              v-tooltip.top="'Usar semana actual'"
+            />
+          </div>
+          <small class="text-color-secondary">
+            <i class="pi pi-info-circle mr-1"></i>
+            Selecciona un rango de fechas para ver todas las guardias en ese período
+          </small>
+        </div>
+
+        <!-- Tipo de sustitución -->
+        <div class="field">
+          <label class="font-bold block mb-2">Tipo de Sustitución</label>
+          <div class="flex flex-column gap-3">
+            <div class="flex align-items-center gap-2 p-3 border-round surface-100 cursor-pointer" 
+                 :class="{'border-2 border-primary': swapType === 'single'}"
+                 @click="swapType = 'single'">
+              <RadioButton v-model="swapType" inputId="single" name="swapType" value="single" />
+              <label for="single" class="flex-1 cursor-pointer">
+                <span class="font-semibold">Solo este día</span>
+                <p class="text-sm text-color-secondary m-0 mt-1">Solicitar cambio únicamente para la fecha seleccionada</p>
+              </label>
+            </div>
+            <div class="flex align-items-center gap-2 p-3 border-round surface-100 cursor-pointer" 
+                 :class="{'border-2 border-primary': swapType === 'multiple'}"
+                 @click="swapType = 'multiple'">
+              <RadioButton v-model="swapType" inputId="multiple" name="swapType" value="multiple" />
+              <label for="multiple" class="flex-1 cursor-pointer">
+                <span class="font-semibold">Varios días específicos</span>
+                <p class="text-sm text-color-secondary m-0 mt-1">Seleccionar días específicos de esta semana</p>
+              </label>
+            </div>
+            <div class="flex align-items-center gap-2 p-3 border-round surface-100 cursor-pointer" 
+                 :class="{'border-2 border-primary': swapType === 'all'}"
+                 @click="swapType = 'all'">
+              <RadioButton v-model="swapType" inputId="all" name="swapType" value="all" />
+              <label for="all" class="flex-1 cursor-pointer">
+                <span class="font-semibold">Todos los días de esta guardia</span>
+                <p class="text-sm text-color-secondary m-0 mt-1">Solicitar cambio para todas las fechas de esta guardia en la semana</p>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Selector de días para múltiple -->
+        <div v-if="swapType === 'multiple'" class="field">
+          <label class="font-bold block mb-2">Seleccione los días a cambiar:</label>
+          <div class="grid">
+            <div v-for="day in availableDays" :key="day.date" 
+                 class="col-12 md:col-6 lg:col-4">
+              <div class="flex align-items-center gap-2 p-2 border-round cursor-pointer surface-100"
+                   :class="{'bg-primary-100 border-primary': selectedDays.includes(day.date)}"
+                   @click="toggleDay(day.date)">
+                <Checkbox 
+                  :modelValue="selectedDays.includes(day.date)"
+                  :binary="true"
+                  @update:modelValue="toggleDay(day.date)"
+                />
+                <div class="flex flex-column">
+                  <span class="text-sm font-semibold">{{ day.dayName }} - {{ day.dayNameFull }}</span>
+                  <span class="text-xs text-color-secondary">{{ formatShortDate(day.date) }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <small v-if="submitted && selectedDays.length === 0" class="p-error">
+            Debe seleccionar al menos un día
+          </small>
+          <p class="text-sm text-color-secondary mt-2">
+            <i class="pi pi-info-circle mr-1"></i>
+            {{ availableDays.length }} días disponibles en el rango seleccionado 
+            <span v-if="customStartDate && customEndDate">
+              ({{ formatShortDate(customStartDate) }} - {{ formatShortDate(customEndDate) }})
+            </span>
+          </p>
+        </div>
+
+        <!-- Información para todos los días -->
+        <div v-if="swapType === 'all'" class="surface-100 border-round p-3 border-1 surface-border">
+          <p class="text-sm m-0">
+            <i class="pi pi-info-circle mr-1"></i>
+            Se solicitará el cambio para <strong>{{ allWeekDays.length }} días</strong> en el rango seleccionado.
+          </p>
+          <ul class="text-sm text-color-secondary mt-2 mb-0 pl-3">
+            <li v-for="day in allWeekDays" :key="day.date">
+              {{ day.dayName }} {{ formatShortDate(day.date) }}
+            </li>
+          </ul>
+          <p class="text-xs text-color-secondary mt-2">
+            <i class="pi pi-calendar mr-1"></i>
+            Rango: {{ formatShortDate(customStartDate) }} - {{ formatShortDate(customEndDate) }}
+          </p>
+        </div>
+
+        <!-- Información para un solo día -->
+        <div v-if="swapType === 'single'" class="surface-100 border-round p-3 border-1 surface-border">
+          <p class="text-sm m-0">
+            <i class="pi pi-info-circle mr-1"></i>
+            Se solicitará el cambio solo para <strong>{{ formatDate(selectedAssignment?.date) }}</strong>
+          </p>
         </div>
 
         <div class="field" v-if="authStore.isAdmin">
@@ -264,6 +384,9 @@ import AccordionContent from 'primevue/accordioncontent'
 import Message from 'primevue/message'
 import Dropdown from 'primevue/dropdown'
 import Textarea from 'primevue/textarea'
+import Checkbox from 'primevue/checkbox'
+import RadioButton from 'primevue/radiobutton'
+import Calendar from 'primevue/calendar'
 
 const shiftStore = useShiftStore()
 const guardStore = useGuardStore()
@@ -287,6 +410,15 @@ const requestingSubstitute = ref(false)
 const substituteResult = ref(null)
 const usersByDepartment = ref([])
 const allDepartments = ref([])
+
+// Variables para selección de días
+const swapType = ref('single') // 'single', 'multiple', 'all'
+const selectedDays = ref([])
+const availableDays = ref([])
+const allWeekDays = ref([])
+const dateRange = ref([])
+const customStartDate = ref(null)
+const customEndDate = ref(null)
 
 const currentMonthName = computed(() => {
   const monthName = currentDate.value.toLocaleString('es-ES', { month: 'long' })
@@ -352,12 +484,6 @@ const refreshAssignments = async () => {
   await loadAssignments()
   await guardStore.fetchGuards()
   alert(`Asignaciones cargadas: ${shiftStore.assignments.length}, Guardias: ${guardStore.guards.length}`)
-}
-
-const formatDate = (dateString) => {
-  if (!dateString) return ''
-  const [year, month, day] = dateString.split('-')
-  return `${day}/${month}/${year}`
 }
 
 const selectDay = async (day) => {
@@ -445,13 +571,8 @@ const loadAssignments = async () => {
   try {
     const month = currentDate.value.getMonth() + 1
     const year = currentDate.value.getFullYear()
-    const response = await api.get('/api/assignments/calendar', {
-      params: { month, year }
-    })
-    if (response.data) {
-      console.log('Eventos del calendario cargados:', response.data.events)
-      shiftStore.assignments = response.data.events || []
-    }
+    await shiftStore.fetchAssignments(month, year)
+    console.log('✅ Assignments loaded in store:', shiftStore.assignments.length)
   } catch (error) {
     console.error('Error loading calendar events:', error)
   }
@@ -483,26 +604,50 @@ const openSubstituteDialog = async (assignment) => {
   console.log('Assignment guard:', assignment.guard)
   console.log('Assignment guard departmentId:', assignment.guard?.departmentId)
   console.log('Assignment user:', assignment.user)
-  
+  console.log('ShiftStore assignments count:', shiftStore.assignments.length)
+
+  // Asegurarse de que las asignaciones estén cargadas
+  if (shiftStore.assignments.length === 0) {
+    console.log('No hay asignaciones cargadas, cargando...')
+    await loadAssignments()
+  }
+
   selectedAssignment.value = assignment
   substituteUserId.value = null
   substituteNotes.value = ''
   submitted.value = false
   substituteResult.value = null
+  swapType.value = 'single'
+  selectedDays.value = [assignment.date] // Iniciar con el día seleccionado
+  availableDays.value = []
+  allWeekDays.value = []
   
+  // Inicializar rango de fechas (semana actual)
+  const selectedDate = new Date(assignment.date)
+  const startOfWeek = new Date(selectedDate)
+  startOfWeek.setDate(selectedDate.getDate() - selectedDate.getDay() + 1)
+  const endOfWeek = new Date(startOfWeek)
+  endOfWeek.setDate(startOfWeek.getDate() + 6)
+  dateRange.value = [startOfWeek, endOfWeek]
+  customStartDate.value = startOfWeek
+  customEndDate.value = endOfWeek
+
+  // Calcular días de la semana para la guardia seleccionada
+  await calculateWeekDays(assignment, startOfWeek, endOfWeek)
+
   // Obtener el departmentId de la guardia
   const deptId = assignment.guard?.departmentId
   console.log('Department ID de la guardia:', deptId)
   console.log('Is ADMIN:', authStore.isAdmin)
   console.log('Auth user:', authStore.user)
-  
+
   substituteDepartmentId.value = deptId
-  
+
   // Cargar departamentos si es ADMIN
   if (authStore.isAdmin) {
     await loadAllDepartments()
   }
-  
+
   // Cargar usuarios del departamento - USAR EL DEPARTMENT ID CORRECTO
   if (deptId) {
     console.log('Cargando usuarios del departamento:', deptId)
@@ -515,7 +660,7 @@ const openSubstituteDialog = async (assignment) => {
       await loadUsersByDepartment(authStore.user.department)
     }
   }
-  
+
   substituteDialog.value = true
 }
 
@@ -551,6 +696,222 @@ const hideSubstituteDialog = () => {
   substituteNotes.value = ''
   submitted.value = false
   substituteResult.value = null
+  swapType.value = 'single'
+  selectedDays.value = []
+  availableDays.value = []
+  allWeekDays.value = []
+  dateRange.value = []
+  customStartDate.value = null
+  customEndDate.value = null
+}
+
+// Calcular días de la guardia en el rango de fechas
+const calculateWeekDays = async (assignment, startDate = null, endDate = null) => {
+  console.log('=== CALCULATE WEEK DAYS ===')
+  console.log('Assignment:', assignment)
+  console.log('Assignment.guard:', assignment.guard)
+  console.log('Assignment.user:', assignment.user)
+  console.log('Date range:', startDate, 'to', endDate)
+  
+  const guardId = assignment.guard?.id || assignment.guardId
+  const userId = assignment.user?.id || assignment.userId
+  
+  if (!guardId || !userId) {
+    console.error('Missing guardId or userId')
+    return
+  }
+
+  // Si no se proporciona rango, usar la semana actual
+  if (!startDate || !endDate) {
+    const selectedDate = new Date(assignment.date)
+    startDate = new Date(selectedDate)
+    startDate.setDate(selectedDate.getDate() - selectedDate.getDay() + 1)
+    startDate.setHours(0, 0, 0, 0)
+    
+    endDate = new Date(startDate)
+    endDate.setDate(startDate.getDate() + 6)
+    endDate.setHours(23, 59, 59, 999)
+  }
+
+  const startDateStr = startDate.toISOString().split('T')[0]
+  const endDateStr = endDate.toISOString().split('T')[0]
+  
+  console.log('Date range:', startDateStr, 'to', endDateStr)
+  console.log('Guard ID:', guardId, 'User ID:', userId)
+  
+  // Buscar en las asignaciones ya cargadas en el store
+  const allAssignments = shiftStore.assignments
+  
+  console.log('Total assignments in store:', allAssignments.length)
+  console.log('All assignments for THIS GUARD and USER:')
+  allAssignments.forEach((a, idx) => {
+    const aGuardId = a.guard?.id || a.guardId
+    const aUserId = a.user?.id || a.userId
+    const aDate = a.date || a.start
+    if (aGuardId === guardId && aUserId === userId) {
+      console.log(`  [${idx}] ID: ${a.id}, Date: ${aDate}, GuardID: ${aGuardId}, UserID: ${aUserId}`)
+    }
+  })
+  
+  // Función auxiliar para extraer solo la fecha (YYYY-MM-DD) de un datetime
+  const extractDate = (dateTimeString) => {
+    if (!dateTimeString) return null
+    // Si tiene formato "2026-03-13 08:00:00", extraer solo "2026-03-13"
+    return dateTimeString.split(' ')[0]
+  }
+  
+  // Filtrar asignaciones de esta guardia y usuario en el rango de fechas
+  const weekAssignments = allAssignments.filter(a => {
+    // Verificar que sea la misma guardia (usar ID directo o anidado)
+    const aGuardId = a.guard?.id || a.guardId
+    const aUserId = a.user?.id || a.userId
+    const isSameGuard = aGuardId === guardId
+    const isSameUser = aUserId === userId
+    // Verificar fecha - extraer solo la parte YYYY-MM-DD
+    const assignDate = extractDate(a.date) || extractDate(a.start)
+    const isInRange = assignDate && assignDate >= startDateStr && assignDate <= endDateStr
+    
+    return isSameGuard && isSameUser && isInRange
+  })
+  
+  console.log('Week assignments found:', weekAssignments.length)
+  console.log('Week assignments:', weekAssignments.map(a => ({
+    id: a.id,
+    date: a.date,
+    extractedDate: extractDate(a.date) || extractDate(a.start),
+    dayName: getDayName(extractDate(a.date) || extractDate(a.start)),
+    dayNameFull: getDayNameFull(extractDate(a.date) || extractDate(a.start))
+  })))
+  
+  // Mapear solo los días que tienen guardia asignada
+  allWeekDays.value = weekAssignments.map(a => {
+    const date = extractDate(a.date) || extractDate(a.start)
+    const dayOfWeek = new Date(date).getDay()
+    console.log(`Date: ${date}, DayOfWeek: ${dayOfWeek}, DayName: ${getDayName(date)}`)
+    return {
+      date: date,
+      dayName: getDayName(date),
+      dayNameFull: getDayNameFull(date),
+      dayOfWeek: dayOfWeek,
+      id: a.id,
+      guardId: a.guard?.id || a.guardId,
+      userId: a.user?.id || a.userId
+    }
+  })
+  
+  console.log('Before filter (all days):', allWeekDays.value.length)
+  console.log('Days before filter:', allWeekDays.value.map(d => `${d.dayName} ${d.date} (dow: ${d.dayOfWeek})`))
+  
+  // NO filtrar domingos - mostrar TODOS los días
+  // availableDays son todos los días de la guardia en el rango
+  availableDays.value = allWeekDays.value.map(a => ({
+    date: a.date,
+    dayName: a.dayName,
+    dayNameFull: a.dayNameFull
+  }))
+
+  // Inicializar selectedDays con el día seleccionado
+  selectedDays.value = [assignment.date]
+  
+  console.log('allWeekDays (sin domingos):', allWeekDays.value.length)
+  console.log('availableDays:', availableDays.value.length)
+  console.log('Days:', allWeekDays.value.map(d => `${d.dayName} ${d.date}`))
+}
+
+const onDateRangeChange = async () => {
+  if (dateRange.value && dateRange.value.length === 2) {
+    customStartDate.value = dateRange.value[0]
+    customEndDate.value = dateRange.value[1]
+    console.log('Date range changed:', customStartDate.value, 'to', customEndDate.value)
+    
+    // Recalcular días con el nuevo rango
+    if (selectedAssignment.value) {
+      await calculateWeekDays(selectedAssignment.value, customStartDate.value, customEndDate.value)
+    }
+  }
+}
+
+const resetDateRange = async () => {
+  if (!selectedAssignment.value) return
+  
+  const selectedDate = new Date(selectedAssignment.value.date)
+  const startOfWeek = new Date(selectedDate)
+  startOfWeek.setDate(selectedDate.getDate() - selectedDate.getDay() + 1)
+  const endOfWeek = new Date(startOfWeek)
+  endOfWeek.setDate(startOfWeek.getDate() + 6)
+  
+  dateRange.value = [startOfWeek, endOfWeek]
+  customStartDate.value = startOfWeek
+  customEndDate.value = endOfWeek
+  
+  await calculateWeekDays(selectedAssignment.value, startOfWeek, endOfWeek)
+}
+
+const getDayName = (dateString) => {
+  if (!dateString) return 'N/A'
+  // Asegurarse de que la fecha se parsea correctamente
+  const parts = dateString.split(' ')[0].split('-')
+  const date = new Date(parts[0], parts[1] - 1, parts[2])
+  const days = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
+  return days[date.getDay()]
+}
+
+const getDayNameFull = (dateString) => {
+  if (!dateString) return ''
+  const parts = dateString.split(' ')[0].split('-')
+  const date = new Date(parts[0], parts[1] - 1, parts[2])
+  return date.toLocaleDateString('es-ES', { weekday: 'long' })
+}
+
+const formatDate = (dateString) => {
+  if (!dateString) return ''
+  const date = new Date(dateString)
+  return date.toLocaleDateString('es-ES', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  })
+}
+
+const formatShortDate = (dateString) => {
+  if (!dateString) return ''
+  // Asegurarse de que es un string
+  const dateStr = String(dateString)
+  // Usar la fecha directamente sin conversión de zona horaria
+  const parts = dateStr.split(' ')[0].split('-')
+  const date = new Date(parts[0], parts[1] - 1, parts[2])
+  return date.toLocaleDateString('es-ES', {
+    day: 'numeric',
+    month: 'short'
+  })
+}
+
+const formatDateList = (dates) => {
+  if (!dates || !Array.isArray(dates)) return ''
+  return dates.map(d => {
+    const dateStr = String(d)
+    const parts = dateStr.split(' ')[0].split('-')
+    const date = new Date(parts[0], parts[1] - 1, parts[2])
+    return date.toLocaleDateString('es-ES', {
+      day: 'numeric',
+      month: 'numeric',
+      year: 'numeric'
+    })
+  }).join(', ')
+}
+
+const toggleDay = (date) => {
+  const index = selectedDays.value.indexOf(date)
+  if (index === -1) {
+    // Agregar día si no está seleccionado
+    selectedDays.value.push(date)
+  } else {
+    // Remover día si ya está seleccionado (pero no permitir dejar vacío si es el único)
+    if (selectedDays.value.length > 1) {
+      selectedDays.value.splice(index, 1)
+    }
+  }
 }
 
 const API_URL = 'http://localhost:8000'
@@ -629,36 +990,60 @@ const loadUsersByDepartment = async (departmentId) => {
 const requestSubstitute = async () => {
   submitted.value = true
 
+  // Validar según el tipo de swap
   if (!substituteUserId.value) {
+    return
+  }
+
+  if (swapType.value === 'multiple' && selectedDays.value.length === 0) {
     return
   }
 
   requestingSubstitute.value = true
   substituteResult.value = null
-  
+
   console.log('=== REQUEST SUBSTITUTE ===')
+  console.log('Swap Type:', swapType.value)
   console.log('Assignment ID:', selectedAssignment.value?.id)
   console.log('Substitute User ID:', substituteUserId.value)
   console.log('Notes:', substituteNotes.value)
+  console.log('Selected Days:', selectedDays.value)
+  console.log('All Week Days:', allWeekDays.value)
 
   try {
-    // Crear solicitud de sustitución
     const token = localStorage.getItem('token')
     const assignmentId = selectedAssignment.value?.id
-    
+
     if (!assignmentId) {
       throw new Error('No assignment ID available')
     }
-    
+
     const url = `${API_URL}/api/assignments/${assignmentId}/swap`
     console.log('URL:', url)
-    
+
+    // Determinar qué fechas enviar según el tipo de swap
+    let datesToSwap = []
+    if (swapType.value === 'single') {
+      // Solo el día seleccionado en el calendario
+      datesToSwap = [selectedAssignment.value.date]
+    } else if (swapType.value === 'multiple') {
+      // Los días seleccionados con checkbox (incluyendo el día original)
+      datesToSwap = selectedDays.value
+    } else if (swapType.value === 'all') {
+      // Todos los días de la guardia en la semana
+      datesToSwap = allWeekDays.value.map(d => d.date)
+    }
+
+    console.log('Dates to swap:', datesToSwap)
+
     const body = {
       newUserId: substituteUserId.value,
-      reason: substituteNotes.value || null
+      reason: substituteNotes.value || null,
+      dates: datesToSwap,
+      swapType: swapType.value
     }
     console.log('Body:', body)
-    
+
     const response = await fetch(url, {
       method: 'POST',
       headers: {
@@ -667,13 +1052,13 @@ const requestSubstitute = async () => {
       },
       body: JSON.stringify(body)
     })
-    
+
     console.log('Response status:', response.status)
 
     if (response.status === 401) {
       throw new Error('Token inválido o expirado')
     }
-    
+
     if (response.status === 404) {
       throw new Error('Asignación no encontrada')
     }
@@ -682,9 +1067,10 @@ const requestSubstitute = async () => {
     console.log('Response data:', data)
 
     if (response.ok) {
+      const count = datesToSwap.length
       substituteResult.value = {
         success: true,
-        message: '✅ Solicitud de cambio enviada. El usuario seleccionado recibirá una notificación y deberá aceptar el cambio.'
+        message: `✅ Solicitud de cambio enviada para ${count} día${count !== 1 ? 's' : ''}. El usuario seleccionado recibirá una notificación y deberá aceptar el cambio.`
       }
 
       // Cerrar dialog después de 3 segundos

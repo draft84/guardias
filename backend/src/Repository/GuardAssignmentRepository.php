@@ -69,6 +69,29 @@ class GuardAssignmentRepository extends ServiceEntityRepository
     /**
      * @return GuardAssignment[]
      */
+    public function findByGuardAndUserAndDateRange(
+        string $guardId,
+        string $userId,
+        \DateTimeInterface $start,
+        \DateTimeInterface $end
+    ): array {
+        return $this->createQueryBuilder('ga')
+            ->where('ga.guard = :guard')
+            ->setParameter('guard', $guardId)
+            ->andWhere('ga.user = :user')
+            ->setParameter('user', $userId)
+            ->andWhere('ga.date BETWEEN :start AND :end')
+            ->setParameter('start', $start)
+            ->setParameter('end', $end)
+            ->orderBy('ga.date', 'ASC')
+            ->addOrderBy('ga.startTime', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
+     * @return GuardAssignment[]
+     */
     public function findActiveAssignments(): array
     {
         return $this->createQueryBuilder('ga')

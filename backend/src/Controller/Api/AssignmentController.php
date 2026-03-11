@@ -180,7 +180,7 @@ class AssignmentController extends AbstractController
         $endDate = new \DateTime($end);
         
         $assignments = $this->assignmentRepository->findByUserAndDateRange($userId, $startDate, $endDate);
-        
+
         $data = array_map(function (GuardAssignment $assignment) {
             return [
                 'id' => (string) $assignment->getId(),
@@ -189,6 +189,68 @@ class AssignmentController extends AbstractController
                     'id' => (string) $assignment->getGuard()->getId(),
                     'name' => $assignment->getGuard()->getName(),
                     'code' => $assignment->getGuard()->getCode(),
+                ],
+                'startTime' => $assignment->getStartTime()?->format('H:i'),
+                'endTime' => $assignment->getEndTime()?->format('H:i'),
+                'status' => $assignment->getStatus(),
+            ];
+        }, $assignments);
+
+        return new JsonResponse(['assignments' => $data], Response::HTTP_OK);
+    }
+
+    #[Route('/guard/{guardId}/user/{userId}/range', name: 'api_assignments_guard_user_range', methods: ['GET'])]
+    public function getByGuardAndUserRange(
+        string $guardId,
+        string $userId,
+        Request $request
+    ): JsonResponse {
+        // Obtener parámetros de fecha (opcional, usa esta semana por defecto)
+        $startDate = $request->query->get('start');
+        $endDate = $request->query->get('end');
+
+        error_log('📍 RANGE REQUEST - Guard ID: ' . $guardId);
+        error_log('📍 RANGE REQUEST - User ID: ' . $userId);
+        error_log('📍 RANGE REQUEST - Start: ' . ($startDate ?? 'null'));
+        error_log('📍 RANGE REQUEST - End: ' . ($endDate ?? 'null'));
+
+        // Si no se proporcionan fechas, usar la semana actual
+        if (!$startDate || !$endDate) {
+            $now = new \DateTime();
+            $startDate = clone $now;
+            $startDate->modify('monday this week');
+            $startDate->setTime(0, 0, 0);
+            
+            $endDate = clone $now;
+            $endDate->modify('sunday this week');
+            $endDate->setTime(23, 59, 59);
+        } else {
+            $startDate = new \DateTime($startDate);
+            $endDate = new \DateTime($endDate);
+        }
+
+        error_log('📍 RANGE REQUEST - Date range: ' . $startDate->format('Y-m-d') . ' to ' . $endDate->format('Y-m-d'));
+
+        $assignments = $this->assignmentRepository->findByGuardAndUserAndDateRange(
+            $guardId,
+            $userId,
+            $startDate,
+            $endDate
+        );
+
+        error_log('📍 RANGE REQUEST - Found assignments: ' . count($assignments));
+
+        $data = array_map(function (GuardAssignment $assignment) {
+            return [
+                'id' => (string) $assignment->getId(),
+                'date' => $assignment->getDate()?->format('Y-m-d'),
+                'guard' => [
+                    'id' => (string) $assignment->getGuard()->getId(),
+                    'name' => $assignment->getGuard()->getName(),
+                ],
+                'user' => [
+                    'id' => (string) $assignment->getUser()->getId(),
+                    'fullName' => $assignment->getUser()->getFullName(),
                 ],
                 'startTime' => $assignment->getStartTime()?->format('H:i'),
                 'endTime' => $assignment->getEndTime()?->format('H:i'),
@@ -347,7 +409,7 @@ class AssignmentController extends AbstractController
         // Verificar que el usuario que solicita el cambio es el usuario asignado
         $currentUserId = method_exists($user, 'getId') ? (string) $user->getId() : null;
         $assignedUserId = (string) $assignment->getUser()->getId();
-        
+
         if ($currentUserId !== $assignedUserId) {
             return new JsonResponse([
                 'error' => 'Only the assigned user can request a swap',
@@ -362,50 +424,148 @@ class AssignmentController extends AbstractController
             ], Response::HTTP_NOT_FOUND);
         }
 
+        // Obtener fechas a cambiar (puede ser una o varias)
+        $dates = $data['dates'] ?? [$assignment->getDate()->format('Y-m-d')];
+        $swapType = $data['swapType'] ?? 'single';
+
+        error_log('🔄 SWAP REQUEST - Type: ' . $swapType);
+        error_log('🔄 SWAP REQUEST - Dates: ' . implode(', ', $dates));
         error_log('🔄 SWAP REQUEST - Requested by: ' . $user->getFullName() . ' (' . $user->getEmail() . ')');
         error_log('🔄 SWAP REQUEST - New user: ' . $newUser->getFullName() . ' (' . $newUser->getEmail() . ')');
 
-        // CREAR NOTIFICACIÓN PARA EL USUARIO SUSTITUTO
+        // Buscar todas las asignaciones para las fechas especificadas
+        $assignments = [];
+        foreach ($dates as $date) {
+            $assignDate = \DateTime::createFromFormat('Y-m-d', $date);
+            if ($assignDate) {
+                $repoAssignment = $this->entityManager->getRepository(GuardAssignment::class)->findOneBy([
+                    'guard' => $assignment->getGuard(),
+                    'user' => $assignment->getUser(),
+                    'date' => $assignDate,
+                ]);
+                if ($repoAssignment) {
+                    $assignments[] = $repoAssignment;
+                }
+            }
+        }
+
+        if (empty($assignments)) {
+            return new JsonResponse([
+                'error' => 'No assignments found for the specified dates',
+            ], Response::HTTP_NOT_FOUND);
+        }
+
+        // Crear UNA sola notificación con el resumen de todos los días
+        $assignmentIds = array_map(fn($a) => (string) $a->getId(), $assignments);
+        $datesList = array_map(fn($a) => $a->getDate()->format('d/m/Y'), $assignments);
+        $count = count($assignments);
+
+        // Construir mensaje según la cantidad de días
+        if ($count === 1) {
+            $message = sprintf(
+                '%s solicita intercambiar su guardia del %s (%s - %s). ¿Aceptas el cambio?',
+                $user->getFullName(),
+                $assignments[0]->getDate()->format('d/m/Y'),
+                $assignments[0]->getStartTime()->format('H:i'),
+                $assignments[0]->getEndTime()->format('H:i')
+            );
+        } else {
+            $message = sprintf(
+                '%s solicita intercambiar %d guardias. ¿Aceptas el cambio? Días: %s',
+                $user->getFullName(),
+                $count,
+                implode(', ', $datesList)
+            );
+        }
+
         $notification = new Notification();
         $notification->setUser($newUser);
         $notification->setType('swap_request');
-        $notification->setTitle('Solicitud de Cambio de Guardia');
-        $notification->setMessage(
-            sprintf(
-                '%s solicita intercambiar su guardia del %s (%s - %s). ¿Aceptas el cambio?',
-                $user->getFullName(),
-                $assignment->getDate()->format('d/m/Y'),
-                $assignment->getStartTime()->format('H:i'),
-                $assignment->getEndTime()->format('H:i')
-            )
-        );
+        $notification->setTitle('Solicitud de Cambio de Guardia' . ($count > 1 ? ' (' . $count . ' días)' : ''));
+        $notification->setMessage($message);
         $notification->setData([
             'type' => 'swap_request',
-            'assignmentId' => (string) $assignment->getId(),
+            'assignmentIds' => $assignmentIds, // Array con TODOS los IDs
+            'assignmentId' => $assignmentIds[0], // Mantener compatibilidad
             'requestedBy' => [
                 'id' => (string) $user->getId(),
                 'fullName' => $user->getFullName(),
             ],
             'guard' => [
                 'name' => $assignment->getGuard()->getName(),
-                'date' => $assignment->getDate()->format('Y-m-d'),
-                'startTime' => $assignment->getStartTime()->format('H:i'),
-                'endTime' => $assignment->getEndTime()->format('H:i'),
+                'dates' => $datesList, // Array con todas las fechas
+                'count' => $count,
             ],
             'reason' => $data['reason'] ?? null,
+            'swapType' => $swapType,
+            'totalAssignments' => $count,
         ]);
 
-        error_log('🔔 SWAP NOTIFICATION - Creating for user: ' . $newUser->getEmail() . ' (ID: ' . $newUser->getId() . ')');
-        error_log('🔔 SWAP NOTIFICATION - Notification user_id: ' . $notification->getUser()->getId());
-
         $this->entityManager->persist($notification);
+        
+        // Notificar a los managers del departamento del usuario que solicita el cambio
+        $userDepartment = $user->getDepartment();
+        if ($userDepartment) {
+            // Obtener todos los usuarios del departamento
+            $departmentUsers = $this->entityManager->getRepository(User::class)->findBy([
+                'department' => $userDepartment,
+            ]);
+            
+            foreach ($departmentUsers as $manager) {
+                $roles = $manager->getRoles();
+                // Verificar si es SOLO MANAGER (no ADMIN)
+                if (in_array('ROLE_MANAGER', $roles, true) && !in_array('ROLE_ADMIN', $roles, true)) {
+                    // No notificar al mismo usuario que solicita el cambio ni al destinatario
+                    if ($manager->getId() !== $user->getId() && $manager->getId() !== $newUser->getId()) {
+                        $managerNotification = new Notification();
+                        $managerNotification->setUser($manager);
+                        $managerNotification->setType('swap_request');
+                        $managerNotification->setTitle('Solicitud de Cambio de Guardia (Información)');
+                        $managerNotification->setMessage(
+                            sprintf(
+                                '%s solicitó cambio de %d guardia(s) a %s. Días: %s',
+                                $user->getFullName(),
+                                $count,
+                                $newUser->getFullName(),
+                                implode(', ', $datesList)
+                            )
+                        );
+                        $managerNotification->setData([
+                            'type' => 'swap_request_info',
+                            'requestedBy' => [
+                                'id' => (string) $user->getId(),
+                                'fullName' => $user->getFullName(),
+                            ],
+                            'assignedTo' => [
+                                'id' => (string) $newUser->getId(),
+                                'fullName' => $newUser->getFullName(),
+                            ],
+                            'guard' => [
+                                'name' => $assignment->getGuard()->getName(),
+                                'dates' => $datesList,
+                                'count' => $count,
+                            ],
+                        ]);
+                        $this->entityManager->persist($managerNotification);
+                        error_log('📬 MANAGER NOTIFICATION - Sent to: ' . $manager->getEmail() . ' (Roles: ' . implode(', ', $roles) . ')');
+                    }
+                }
+            }
+        }
+        
         $this->entityManager->flush();
 
         error_log('🔔 SWAP NOTIFICATION - Created with ID: ' . $notification->getId());
+        error_log('🔔 SWAP NOTIFICATION - Assignment IDs: ' . implode(', ', $assignmentIds));
+
+        $messageResponse = $count > 1 
+            ? sprintf('Solicitud de cambio enviada para %d días. El usuario debe aceptar para completar el cambio.', $count)
+            : 'Solicitud de cambio enviada. El usuario debe aceptar para completar el cambio.';
 
         return new JsonResponse([
-            'message' => 'Solicitud de cambio enviada. El usuario debe aceptar para completar el cambio.',
+            'message' => $messageResponse,
             'notificationId' => (string) $notification->getId(),
+            'count' => $count,
         ], Response::HTTP_OK);
     }
 
@@ -426,87 +586,6 @@ class AssignmentController extends AbstractController
         // Lógica para rechazar cambio
         return new JsonResponse([
             'message' => 'Swap rejected',
-        ], Response::HTTP_OK);
-    }
-
-    #[Route('/notifications/{notificationId}/accept-swap', name: 'api_notifications_accept_swap', methods: ['POST'])]
-    public function acceptSwapFromNotification(
-        Notification $notification,
-        #[CurrentUser] UserInterface $user
-    ): JsonResponse {
-        // Verificar que la notificación es para este usuario
-        if ($notification->getUser()->getId() !== $user->getId()) {
-            return new JsonResponse([
-                'error' => 'Unauthorized',
-            ], Response::HTTP_FORBIDDEN);
-        }
-
-        // Verificar que es una notificación de swap
-        $data = $notification->getData();
-        if (!$data || $data['type'] !== 'swap_request') {
-            return new JsonResponse([
-                'error' => 'Invalid notification type',
-            ], Response::HTTP_BAD_REQUEST);
-        }
-
-        // Buscar la asignación
-        $assignment = $this->entityManager->getRepository(GuardAssignment::class)->find($data['assignmentId']);
-        if (!$assignment) {
-            return new JsonResponse([
-                'error' => 'Assignment not found',
-            ], Response::HTTP_NOT_FOUND);
-        }
-
-        // CAMBIO INMEDIATO - Actualizar la asignación con el nuevo usuario
-        $assignment->setUser($user);
-        
-        // Agregar nota del cambio
-        $existingNotes = $assignment->getNotes() ?? '';
-        $assignment->setNotes(
-            $existingNotes . "\n[Cambio Aceptado: " . 
-            $data['requestedBy']['fullName'] . " → " . $user->getFullName() . 
-            " - " . date('Y-m-d H:i') . "]"
-        );
-
-        // Marcar notificación como leída
-        $notification->setRead(true);
-
-        // Crear notificación para el usuario que solicitó el cambio
-        $requestingUser = $this->entityManager->getRepository(User::class)->find($data['requestedBy']['id']);
-        if ($requestingUser) {
-            $confirmationNotification = new Notification();
-            $confirmationNotification->setUser($requestingUser);
-            $confirmationNotification->setType('swap_accepted');
-            $confirmationNotification->setTitle('Cambio de Guardia Aceptado');
-            $confirmationNotification->setMessage(
-                sprintf(
-                    '%s aceptó el cambio de guardia del %s',
-                    $user->getFullName(),
-                    $assignment->getDate()->format('d/m/Y')
-                )
-            );
-            $confirmationNotification->setData([
-                'type' => 'swap_accepted',
-                'assignmentId' => (string) $assignment->getId(),
-                'acceptedBy' => [
-                    'id' => (string) $user->getId(),
-                    'fullName' => $user->getFullName(),
-                ],
-            ]);
-            $this->entityManager->persist($confirmationNotification);
-        }
-
-        $this->entityManager->flush();
-
-        return new JsonResponse([
-            'message' => 'Cambio de guardia aceptado exitosamente',
-            'assignment' => [
-                'id' => (string) $assignment->getId(),
-                'user' => [
-                    'id' => (string) $user->getId(),
-                    'fullName' => $user->getFullName(),
-                ],
-            ],
         ], Response::HTTP_OK);
     }
 }

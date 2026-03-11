@@ -9,6 +9,7 @@ import UsersView from '@/views/UsersView.vue'
 import GuardsView from '@/views/GuardsView.vue'
 import CalendarView from '@/views/CalendarView.vue'
 import SettingsView from '@/views/SettingsView.vue'
+import NotificationsView from '@/views/NotificationsView.vue'
 import NotFoundView from '@/views/NotFoundView.vue'
 import PublicGuardsView from '@/views/PublicGuardsView.vue'
 
@@ -55,6 +56,11 @@ const routes = [
         path: 'calendar',
         name: 'Calendar',
         component: CalendarView
+      },
+      {
+        path: 'notifications',
+        name: 'Notifications',
+        component: NotificationsView
       },
       {
         path: 'settings',

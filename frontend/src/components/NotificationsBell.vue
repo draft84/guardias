@@ -37,18 +37,19 @@
         <div
           v-for="notification in notifications"
           :key="notification.id"
-          class="notification-item p-3 border-bottom-1 surface-border"
-          :class="{ 'bg-primary-50': !notification.read }"
+          class="notification-item p-3 border-bottom-1 surface-border cursor-pointer"
+          :class="{ 'surface-50': !notification.read }"
+          @click="viewNotification(notification)"
         >
           <div class="flex gap-3">
             <div class="notification-icon flex align-items-center justify-content-center" style="width: 40px; height: 40px; min-width: 40px;">
-              <i 
+              <i
                 class="pi text-lg"
                 :class="getNotificationIcon(notification.type)"
                 :style="{ color: getNotificationColor(notification.type) }"
               ></i>
             </div>
-            
+
             <div class="notification-content flex-1">
               <div class="flex justify-content-between align-items-start">
                 <h4 class="text-sm font-semibold m-0" :class="{ 'text-900': !notification.read, 'text-600': notification.read }">
@@ -58,28 +59,21 @@
                   {{ formatTime(notification.createdAt) }}
                 </span>
               </div>
-              
+
               <p class="text-sm text-color m-0 mt-1">{{ notification.message }}</p>
-              
+
               <!-- Acciones para swap_request -->
-              <div v-if="notification.type === 'swap_request' && !notification.read" class="flex gap-2 mt-2">
-                <Button 
-                  label="Aceptar" 
-                  icon="pi pi-check" 
-                  size="small" 
+              <div v-if="notification.type === 'swap_request' && !notification.read" class="flex gap-2 mt-2" @click.stop>
+                <Button
+                  label="Aceptar"
+                  icon="pi pi-check"
+                  size="small"
                   severity="success"
                   :loading="acceptingSwap"
                   @click="acceptSwap(notification)"
                 />
-                <Button 
-                  label="Ver Detalles" 
-                  icon="pi pi-eye" 
-                  size="small" 
-                  text
-                  @click="viewNotification(notification)"
-                />
               </div>
-              
+
               <!-- Información para swap_accepted -->
               <div v-if="notification.type === 'swap_accepted'" class="mt-2 p-2 border-round surface-100">
                 <p class="text-xs text-color-secondary m-0">
@@ -105,14 +99,16 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useNotificationStore } from '@/stores/notification.store'
+import { useAuthStore } from '@/stores/auth.store'
 import { useRouter } from 'vue-router'
 import Badge from 'primevue/badge'
 import Button from 'primevue/button'
 import ProgressSpinner from 'primevue/progressspinner'
 
 const notificationStore = useNotificationStore()
+const authStore = useAuthStore()
 const router = useRouter()
 
 const isOpen = ref(false)
@@ -124,6 +120,11 @@ const hasUnread = computed(() => notificationStore.hasUnreadNotifications)
 const loading = computed(() => notificationStore.loading)
 
 let pollingInterval = null
+
+// Watch para actualizar el contador en authStore
+watch(unreadCount, (newCount) => {
+  authStore.setUnreadNotificationsCount(newCount)
+})
 
 const toggleDropdown = async () => {
   isOpen.value = !isOpen.value
@@ -162,13 +163,13 @@ const acceptSwap = async (notification) => {
   acceptingSwap.value = true
   try {
     const result = await notificationStore.acceptSwap(notification.id)
-    
+
     // Mostrar mensaje de éxito
     alert(result.message || 'Cambio aceptado exitosamente')
-    
+
     // Recargar notificaciones
     await notificationStore.fetchNotifications(false, 10)
-    
+
     // Cerrar dropdown
     closeDropdown()
   } catch (error) {
@@ -181,13 +182,14 @@ const acceptSwap = async (notification) => {
 const viewNotification = async (notification) => {
   // Marcar como leída
   await notificationStore.markAsRead(notification.id)
-  
-  // Aquí se podría abrir un modal con más detalles
-  console.log('Ver notificación:', notification)
+
+  // Navegar a la vista de notificaciones
+  router.push('/notifications')
+  closeDropdown()
 }
 
 const openFullNotifications = () => {
-  // Aquí se podría navegar a una página de notificaciones
+  router.push('/notifications')
   closeDropdown()
 }
 

@@ -163,8 +163,54 @@ class GuardService
 
     public function deleteGuard(Guard $guard): void
     {
+        // Obtener todas las asignaciones de esta guardia
+        $assignments = $guard->getAssignments();
+        $assignmentIds = [];
+        
+        // Recopilar todos los IDs de asignaciones
+        foreach ($assignments as $assignment) {
+            $assignmentIds[] = (string) $assignment->getId();
+        }
+        
+        error_log('🗑️ DELETE GUARD: ' . $guard->getName());
+        error_log('🗑️ Assignment IDs to remove: ' . implode(', ', $assignmentIds));
+        
+        // Buscar TODAS las notificaciones de tipo swap_request
+        $allNotifications = $this->entityManager->getRepository(\App\Entity\Notification::class)->findAll();
+        error_log('🗑️ Total notifications found: ' . count($allNotifications));
+        
+        $deletedCount = 0;
+        // Eliminar notificaciones que contengan cualquiera de las asignaciones eliminadas
+        foreach ($allNotifications as $notification) {
+            $data = $notification->getData();
+            if ($data) {
+                $notificationAssignmentIds = $data['assignmentIds'] ?? [$data['assignmentId'] ?? null];
+                $notificationAssignmentIds = array_filter($notificationAssignmentIds); // Eliminar nulls
+                
+                // Verificar si hay intersección entre los IDs
+                $intersection = array_intersect($notificationAssignmentIds, $assignmentIds);
+                
+                if (!empty($intersection)) {
+                    // Esta notificación tiene al menos una asignación que se está eliminando
+                    $this->entityManager->remove($notification);
+                    $deletedCount++;
+                    error_log('🗑️ NOTIFICATION DELETED: ' . $notification->getId() . ' - Assignments matched: ' . implode(', ', $intersection));
+                }
+            }
+        }
+        
+        error_log('🗑️ Notifications deleted: ' . $deletedCount);
+        
+        // Eliminar las asignaciones
+        foreach ($assignments as $assignment) {
+            $this->entityManager->remove($assignment);
+        }
+        
+        // Eliminar la guardia
         $this->entityManager->remove($guard);
         $this->entityManager->flush();
+        
+        error_log('🗑️ GUARD DELETED: ' . $guard->getName() . ' - Removed ' . count($assignments) . ' assignments');
     }
 
     public function assignGuard(

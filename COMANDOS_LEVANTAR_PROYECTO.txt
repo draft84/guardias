@@ -1,0 +1,163 @@
+================================================================================
+                    SISTEMA DE GUARDIAS - COMANDOS PARA LEVANTAR
+================================================================================
+
+================================================================================
+OPCIÓN 1: DESDE CERO (Primer arranque o después de docker-compose down)
+================================================================================
+
+# 1. Navegar al directorio docker
+cd /Users/franciscoaumaitre/Downloads/Copia\ de\ guardias\ 2/docker
+
+# 2. Iniciar todos los servicios en segundo plano
+docker-compose up -d
+
+# 3. Verificar que los contenedores estén corriendo
+docker-compose ps
+
+# 4. Ver logs en tiempo real (opcional)
+docker-compose logs -f
+
+# 5. Ver logs de un servicio específico (opcional)
+docker-compose logs -f backend
+docker-compose logs -f frontend
+docker-compose logs -f database
+
+================================================================================
+OPCIÓN 2: CON CONTENEDORES YA CREADOS (Reiniciar o continuar)
+================================================================================
+
+# 1. Navegar al directorio docker
+cd /Users/franciscoaumaitre/Downloads/Copia\ de\ guardias\ 2/docker
+
+# 2. Reiniciar servicios (si estaban detenidos)
+docker-compose restart
+
+# O también puedes usar:
+docker-compose up -d
+
+# 3. Verificar estado
+docker-compose ps
+
+================================================================================
+COMANDOS ÚTILES ADICIONALES
+================================================================================
+
+# Ver logs en tiempo real de todos los servicios
+docker-compose logs -f
+
+# Ver logs de un servicio específico
+docker-compose logs -f backend
+docker-compose logs -f frontend
+docker-compose logs -f database
+docker-compose logs -f phpmyadmin
+
+# Detener todos los servicios
+docker-compose down
+
+# Detener y eliminar volúmenes (¡CUIDADO! Se pierden los datos)
+docker-compose down -v
+
+# Reiniciar un servicio específico
+docker-compose restart backend
+docker-compose restart frontend
+
+# Acceder al contenedor del backend (Symfony)
+docker-compose exec backend bash
+
+# Acceder al contenedor del frontend (Vue.js)
+docker-compose exec frontend bash
+
+# Acceder a la base de datos MySQL
+docker-compose exec database mysql -uguardias_user -pguardias_password guardias
+
+# Ver uso de recursos
+docker-compose top
+
+# Reconstruir contenedores (después de cambios en Dockerfile)
+docker-compose up -d --build
+
+================================================================================
+URLs PARA VISUALIZAR LA APLICACIÓN
+================================================================================
+
+🌐 FRONTEND (Aplicación Vue.js)
+   URL: http://localhost:5173
+   
+🔌 BACKEND API (Symfony REST API)
+   URL: http://localhost:8000
+   
+🗄️ phpMyAdmin (Gestión MySQL)
+   URL: http://localhost:18080
+   Usuario: guardias_user
+   Contraseña: guardias_password
+
+🌐 NGINX (Proxy inverso)
+   URL: http://localhost:80
+
+================================================================================
+CREDENCIALES DE ACCESO AL SISTEMA
+================================================================================
+
+👤 USUARIO ADMINISTRADOR
+   Email: admin@example.com
+   Contraseña: admin123
+   Rol: ADMIN
+
+👤 OTROS USUARIOS DE PRUEBA
+
+   Email: manager@example.com
+   Contraseña: manager123
+   Rol: MANAGER
+   Departamento: Operaciones
+
+   Email: juan@example.com
+   Contraseña: user123
+   Rol: USER
+   Departamento: Operaciones
+
+   Email: maria@example.com
+   Contraseña: user123
+   Rol: USER
+   Departamento: Operaciones
+
+================================================================================
+COMANDOS PARA VERIFICAR EL ESTADO DE LA APLICACIÓN
+================================================================================
+
+# Verificar que el frontend responde (debe devolver 200)
+curl -s -o /dev/null -w "%{http_code}" http://localhost:5173
+
+# Verificar que el backend responde (debe devolver 200 o 404)
+curl -s -o /dev/null -w "%{http_code}" http://localhost:8000
+
+# Probar endpoint de login de la API
+curl -X POST http://localhost:8000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@example.com","password":"admin123"}'
+
+================================================================================
+SOLUCIÓN DE PROBLEMAS COMUNES
+================================================================================
+
+❌ ERROR: "Port already in use"
+   Solución: Los puertos 5173, 8000, 13306 o 18080 están ocupados
+   - Verifica qué proceso usa el puerto: lsof -i :5173
+   - Detén el proceso o cambia el puerto en docker-compose.yml
+
+❌ ERROR: "Database connection failed"
+   Solución: MySQL puede estar iniciando
+   - Espera 10-15 segundos y reintenta
+   - Verifica logs: docker-compose logs database
+
+❌ ERROR: "Cannot connect to Docker daemon"
+   Solución: Docker Desktop no está corriendo
+   - Abre Docker Desktop desde Applications
+
+❌ ERROR: "JWT keys not found"
+   Solución: Generar claves JWT
+   docker-compose exec backend php bin/console lexik:jwt:generate-keypair
+
+================================================================================
+FECHA DE GENERACIÓN: 2026-03-11
+================================================================================

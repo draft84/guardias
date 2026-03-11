@@ -33,6 +33,14 @@
           <span v-if="!sidebarCollapsed">Calendario</span>
         </router-link>
 
+        <router-link to="/notifications" class="nav-item">
+          <div class="nav-item-with-badge">
+            <i class="pi pi-bell"></i>
+            <Badge v-if="notificationStore.unreadCount > 0" :value="notificationStore.unreadCount" severity="danger" size="small" />
+          </div>
+          <span v-if="!sidebarCollapsed">Notificaciones</span>
+        </router-link>
+
         <router-link v-if="authStore.isAdmin" to="/settings" class="nav-item">
           <i class="pi pi-cog"></i>
           <span v-if="!sidebarCollapsed">Configuración</span>
@@ -91,17 +99,21 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth.store'
+import { useNotificationStore } from '@/stores/notification.store'
 import { useLayoutStore } from '@/stores/layout.store'
 import Button from 'primevue/button'
 import NotificationsBell from '@/components/NotificationsBell.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
+const notificationStore = useNotificationStore()
 const layoutStore = useLayoutStore()
 const sidebarCollapsed = ref(false)
+
+let pollingInterval = null
 
 const toggleSidebar = () => {
   sidebarCollapsed.value = !sidebarCollapsed.value
@@ -115,6 +127,31 @@ const logout = async () => {
   await authStore.logout()
   router.push('/login')
 }
+
+const startPolling = () => {
+  // Actualizar contador cada 10 segundos
+  pollingInterval = setInterval(() => {
+    notificationStore.fetchUnreadCount()
+  }, 10000)
+}
+
+const stopPolling = () => {
+  if (pollingInterval) {
+    clearInterval(pollingInterval)
+    pollingInterval = null
+  }
+}
+
+onMounted(async () => {
+  // Cargar contador inicial de notificaciones no leídas
+  await notificationStore.fetchUnreadCount()
+  // Iniciar polling para actualizar el badge
+  startPolling()
+})
+
+onUnmounted(() => {
+  stopPolling()
+})
 </script>
 
 <style scoped>
@@ -185,6 +222,21 @@ const logout = async () => {
   font-size: 1.25rem;
   width: 24px;
   margin-right: 0.75rem;
+}
+
+.nav-item-with-badge {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.nav-item-with-badge .p-badge {
+  position: absolute;
+  top: -5px;
+  right: -10px;
+  min-width: 18px;
+  height: 18px;
+  font-size: 0.65rem;
 }
 
 .sidebar-collapsed .nav-item span {

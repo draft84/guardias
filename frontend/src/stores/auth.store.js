@@ -4,7 +4,8 @@ import api from '@/services/api'
 export const useAuthStore = defineStore('auth', {
   state: () => ({
     user: JSON.parse(localStorage.getItem('user') || 'null'),
-    token: localStorage.getItem('token') || null
+    token: localStorage.getItem('token') || null,
+    unreadNotificationsCount: 0
   }),
 
   getters: {
@@ -51,6 +52,7 @@ export const useAuthStore = defineStore('auth', {
       } finally {
         this.token = null
         this.user = null
+        this.unreadNotificationsCount = 0
         localStorage.removeItem('token')
         localStorage.removeItem('user')
       }
@@ -89,6 +91,10 @@ export const useAuthStore = defineStore('auth', {
 
     getToken() {
       return localStorage.getItem('token')
+    },
+
+    setUnreadNotificationsCount(count) {
+      this.unreadNotificationsCount = count
     }
   }
 })

@@ -254,7 +254,7 @@ class GuardController extends AbstractController
     }
 
     #[Route('/{id}', name: 'api_guards_delete', methods: ['DELETE'])]
-    public function delete(Guard $guard): JsonResponse
+    public function delete(Guard $guard, GuardService $guardService): JsonResponse
     {
         // Verificar permisos de escritura
         $error = $this->checkWritePermissions();
@@ -268,8 +268,8 @@ class GuardController extends AbstractController
             return $error;
         }
 
-        $this->entityManager->remove($guard);
-        $this->entityManager->flush();
+        // Usar el servicio para eliminar la guardia (incluye eliminar notificaciones relacionadas)
+        $guardService->deleteGuard($guard);
 
         return new JsonResponse([
             'message' => 'Guard deleted successfully',
