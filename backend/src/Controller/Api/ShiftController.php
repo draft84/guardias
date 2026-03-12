@@ -37,7 +37,9 @@ class ShiftController extends AbstractController
                 'endTime' => $shift->getEndTime()?->format('H:i'),
                 'type' => $shift->getType(),
                 'color' => $shift->getColor(),
+                'description' => $shift->getDescription(),
                 'active' => $shift->isActive(),
+                'isUsed' => false, // Se podría verificar si hay tareas con este turno
                 'createdAt' => $shift->getCreatedAt()?->format('Y-m-d H:i:s'),
             ];
         }, $shifts);
@@ -86,13 +88,29 @@ class ShiftController extends AbstractController
     #[Route('', name: 'api_shifts_create', methods: ['POST'])]
     public function create(Request $request): JsonResponse
     {
+        // Verificar permisos - solo ADMIN o MANAGER pueden crear turnos
+        $user = $this->getUser();
+        if (!in_array('ROLE_ADMIN', $user->getRoles(), true) && !in_array('ROLE_MANAGER', $user->getRoles(), true)) {
+            return new JsonResponse([
+                'error' => 'Acceso denegado. Se requieren permisos de MANAGER o ADMIN',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
         $data = json_decode($request->getContent(), true);
 
-        if (empty($data['name']) || empty($data['code']) || 
+        if (empty($data['name']) || empty($data['code']) ||
             empty($data['startTime']) || empty($data['endTime'])) {
             return new JsonResponse([
                 'error' => 'Name, code, startTime and endTime are required',
             ], Response::HTTP_BAD_REQUEST);
+        }
+
+        // Verificar si el turno ya existe
+        $existingShift = $this->shiftRepository->findOneBy(['code' => $data['code']]);
+        if ($existingShift) {
+            return new JsonResponse([
+                'error' => 'El código del turno ya existe',
+            ], Response::HTTP_CONFLICT);
         }
 
         $shift = new Shift();
@@ -102,13 +120,14 @@ class ShiftController extends AbstractController
         $shift->setEndTime(new \DateTime($data['endTime']));
         $shift->setType($data['type'] ?? 'custom');
         $shift->setColor($data['color'] ?? '#3498db');
+        $shift->setDescription($data['description'] ?? null);
         $shift->setActive($data['active'] ?? true);
 
         $this->entityManager->persist($shift);
         $this->entityManager->flush();
 
         return new JsonResponse([
-            'message' => 'Shift created successfully',
+            'message' => 'Turno creado exitosamente',
             'shift' => [
                 'id' => (string) $shift->getId(),
                 'name' => $shift->getName(),
@@ -120,12 +139,27 @@ class ShiftController extends AbstractController
     #[Route('/{id}', name: 'api_shifts_update', methods: ['PUT'])]
     public function update(Request $request, Shift $shift): JsonResponse
     {
+        // Verificar permisos
+        $user = $this->getUser();
+        if (!in_array('ROLE_ADMIN', $user->getRoles(), true) && !in_array('ROLE_MANAGER', $user->getRoles(), true)) {
+            return new JsonResponse([
+                'error' => 'Acceso denegado. Se requieren permisos de MANAGER o ADMIN',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
         $data = json_decode($request->getContent(), true);
 
         if (isset($data['name'])) {
             $shift->setName($data['name']);
         }
         if (isset($data['code'])) {
+            // Verificar que el nuevo código no esté en uso por otro turno
+            $existingShift = $this->shiftRepository->findOneBy(['code' => $data['code']]);
+            if ($existingShift && $existingShift->getId() !== $shift->getId()) {
+                return new JsonResponse([
+                    'error' => 'El código del turno ya está en uso',
+                ], Response::HTTP_CONFLICT);
+            }
             $shift->setCode($data['code']);
         }
         if (isset($data['startTime'])) {
@@ -140,6 +174,9 @@ class ShiftController extends AbstractController
         if (isset($data['color'])) {
             $shift->setColor($data['color']);
         }
+        if (isset($data['description'])) {
+            $shift->setDescription($data['description']);
+        }
         if (isset($data['active'])) {
             $shift->setActive($data['active']);
         }
@@ -147,7 +184,7 @@ class ShiftController extends AbstractController
         $this->entityManager->flush();
 
         return new JsonResponse([
-            'message' => 'Shift updated successfully',
+            'message' => 'Turno actualizado exitosamente',
             'shift' => [
                 'id' => (string) $shift->getId(),
                 'name' => $shift->getName(),
@@ -159,11 +196,22 @@ class ShiftController extends AbstractController
     #[Route('/{id}', name: 'api_shifts_delete', methods: ['DELETE'])]
     public function delete(Shift $shift): JsonResponse
     {
+        // Verificar permisos
+        $user = $this->getUser();
+        if (!in_array('ROLE_ADMIN', $user->getRoles(), true) && !in_array('ROLE_MANAGER', $user->getRoles(), true)) {
+            return new JsonResponse([
+                'error' => 'Acceso denegado. Se requieren permisos de MANAGER o ADMIN',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
+        // TODO: Verificar si el turno está en uso por alguna tarea
+        // Por ahora, permitimos eliminar pero en producción se debería verificar
+
         $this->entityManager->remove($shift);
         $this->entityManager->flush();
 
         return new JsonResponse([
-            'message' => 'Shift deleted successfully',
+            'message' => 'Turno eliminado exitosamente',
         ], Response::HTTP_OK);
     }
 }

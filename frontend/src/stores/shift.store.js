@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
+import api from '@/services/api'
 
-const API_URL = 'http://localhost:8000'
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 export const useShiftStore = defineStore('shift', {
   state: () => ({
@@ -14,13 +15,12 @@ export const useShiftStore = defineStore('shift', {
     async fetchShifts() {
       this.loading = true
       try {
-        const token = localStorage.getItem('token')
-        const response = await fetch(`${API_URL}/api/shifts`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        })
-        if (!response.ok) throw new Error('Error')
-        const data = await response.json()
-        this.shifts = data.shifts || []
+        const response = await api.get('/api/shifts')
+        this.shifts = response.data.shifts || []
+      } catch (error) {
+        console.error('Error fetching shifts:', error)
+        this.error = error.message
+        throw error
       } finally {
         this.loading = false
       }
@@ -29,17 +29,12 @@ export const useShiftStore = defineStore('shift', {
     async fetchAssignments(month, year) {
       this.loading = true
       try {
-        const token = localStorage.getItem('token')
-        const params = new URLSearchParams()
-        if (month) params.append('month', month)
-        if (year) params.append('year', year)
-        
-        const response = await fetch(`${API_URL}/api/assignments/calendar?${params.toString()}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        })
-        if (!response.ok) throw new Error('Error')
-        const data = await response.json()
-        this.assignments = data.events || []
+        const params = {}
+        if (month) params.month = month
+        if (year) params.year = year
+
+        const response = await api.get('/api/assignments/calendar', { params })
+        this.assignments = response.data.events || []
         console.log('📅 [ShiftStore] Assignments loaded:', this.assignments.length)
       } catch (error) {
         console.error('❌ [ShiftStore] Error loading assignments:', error)
@@ -48,41 +43,28 @@ export const useShiftStore = defineStore('shift', {
       }
     },
 
-    async createShift(shift) {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`${API_URL}/api/shifts`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(shift)
-      })
-      if (!response.ok) throw new Error('Error')
+    async createShift(name, code, startTime, endTime, type = 'custom', color = '#3498db', description = null) {
+      const response = await api.post('/api/shifts', { name, code, startTime, endTime, type, color, description })
       await this.fetchShifts()
     },
 
-    async updateShift(id, shift) {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`${API_URL}/api/shifts/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(shift)
-      })
-      if (!response.ok) throw new Error('Error')
+    async updateShift(id, name, code, startTime, endTime, type = 'custom', color = '#3498db', description = null) {
+      const response = await api.put(`/api/shifts/${id}`, { name, code, startTime, endTime, type, color, description })
+
+      if (!response.data) {
+        throw new Error('Error al actualizar turno')
+      }
+
       await this.fetchShifts()
     },
 
     async deleteShift(id) {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`${API_URL}/api/shifts/${id}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-      if (!response.ok) throw new Error('Error')
+      const response = await api.delete(`/api/shifts/${id}`)
+
+      if (!response.data) {
+        throw new Error('Error al eliminar turno')
+      }
+
       await this.fetchShifts()
     }
   }

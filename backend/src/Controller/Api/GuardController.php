@@ -14,6 +14,8 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 #[Route('/api/guards')]
 #[IsGranted('IS_AUTHENTICATED_FULLY')]
@@ -76,6 +78,153 @@ class GuardController extends AbstractController
         }, $guards);
 
         return new JsonResponse(['guards' => $data], Response::HTTP_OK);
+    }
+
+    #[Route('/export', name: 'api_guards_export', methods: ['GET'])]
+    public function export(Request $request): Response
+    {
+        /** @var \App\Entity\User $user */
+        $user = $this->getUser();
+        
+        if (!$user) {
+            return new Response('Unauthorized', Response::HTTP_UNAUTHORIZED);
+        }
+        
+        $isAdmin = in_array('ROLE_ADMIN', $user->getRoles(), true);
+        
+        // Obtener filtros
+        $departmentId = $request->query->get('department');
+        
+        // Obtener todas las guardias
+        $guards = $this->entityManager->getRepository(Guard::class)->findAll();
+        
+        // Filtrar por departamento
+        if (!$isAdmin && $user->getDepartment()) {
+            $guards = array_filter($guards, fn($g) => 
+                $g->getDepartment() && $g->getDepartment()->getId() === $user->getDepartment()->getId()
+            );
+        } elseif ($departmentId) {
+            $guards = array_filter($guards, fn($g) => 
+                $g->getDepartment() && (string) $g->getDepartment()->getId() === $departmentId
+            );
+        }
+        
+        // Crear Spreadsheet
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Guardias');
+        
+        // Estilos
+        $headerStyle = [
+            'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
+            'fill' => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['rgb' => '4F46E5']],
+            'alignment' => ['horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER],
+        ];
+        
+        $borderStyle = [
+            'borders' => [
+                'allBorders' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN, 'color' => ['rgb' => 'DDDDDD']],
+            ],
+        ];
+        
+        // Headers
+        $headers = [
+            'Guardia',
+            'Usuario Asignado',
+            'Email',
+            'Teléfono',
+            'Departamento',
+            'Fecha',
+            'Hora Inicio',
+            'Hora Fin',
+            'Duración (horas)'
+        ];
+        
+        $sheet->fromArray([$headers], null, 'A1');
+        $sheet->getStyle('A1:I1')->applyFromArray($headerStyle);
+        
+        // Datos
+        $row = 2;
+        foreach ($guards as $guard) {
+            $assignments = $guard->getAssignments();
+            
+            // Si no tiene asignaciones, mostrar la guardia sin usuario
+            if ($assignments->isEmpty()) {
+                $sheet->fromArray([[
+                    $guard->getName(),
+                    '',
+                    '',
+                    '',
+                    $guard->getDepartment()?->getName() ?? '',
+                    '',
+                    $guard->getStartTime()?->format('H:i'),
+                    $guard->getEndTime()?->format('H:i'),
+                    $guard->getDuration() ? round($guard->getDuration() / 60, 2) : '',
+                ]], null, "A{$row}");
+                $row++;
+            } else {
+                foreach ($assignments as $assignment) {
+                    $userAssigned = $assignment->getUser();
+                    $startTime = $assignment->getStartTime();
+                    $endTime = $assignment->getEndTime();
+                    $durationMinutes = $startTime && $endTime ? 
+                        ($endTime->getTimestamp() - $startTime->getTimestamp()) / 60 : 0;
+                    
+                    // Formato seguro de teléfono
+                    $phone = '';
+                    if ($userAssigned && $userAssigned->getPhone()) {
+                        try {
+                            $phone = '+' . $userAssigned->getPhone()->getCountryCode() . ' ' . $userAssigned->getPhone()->getNationalNumber();
+                        } catch (\Exception $e) {
+                            $phone = $userAssigned->getPhone();
+                        }
+                    }
+                    
+                    $sheet->fromArray([[
+                        $guard->getName(),
+                        $userAssigned?->getFullName() ?? '',
+                        $userAssigned?->getEmail() ?? '',
+                        $phone,
+                        $guard->getDepartment()?->getName() ?? '',
+                        $assignment->getDate()?->format('Y-m-d'),
+                        $startTime?->format('H:i'),
+                        $endTime?->format('H:i'),
+                        $durationMinutes > 0 ? round($durationMinutes / 60, 2) : '',
+                    ]], null, "A{$row}");
+                    $row++;
+                }
+            }
+        }
+        
+        // Aplicar bordes
+        $lastRow = $row - 1;
+        $sheet->getStyle("A1:I{$lastRow}")->applyFromArray($borderStyle);
+        
+        // Auto-size columns
+        foreach (range('A', 'I') as $col) {
+            $sheet->getColumnDimension($col)->setAutoSize(true);
+        }
+        
+        // Descargar
+        $filename = 'guardias_' . date('Y-m-d_His') . '.xlsx';
+        
+        // Headers CORS
+        header('Access-Control-Allow-Origin: *');
+        header('Access-Control-Allow-Methods: GET, OPTIONS');
+        header('Access-Control-Allow-Headers: Content-Type, Authorization');
+        
+        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        header('Content-Disposition: attachment;filename="' . $filename . '"');
+        header('Cache-Control: max-age=0');
+        header('Cache-Control: max-age=1');
+        header('Expires: Mon, 26 Jul 1997 05:00:00 GMT');
+        header('Last-Modified: ' . gmdate('D, d M Y H:i:s') . ' GMT');
+        header('Cache-Control: cache, must-revalidate');
+        header('Pragma: public');
+        
+        $writer = new Xlsx($spreadsheet);
+        $writer->save('php://output');
+        exit;
     }
 
     #[Route('/{id}', name: 'api_guards_get', methods: ['GET'])]
@@ -271,9 +420,14 @@ class GuardController extends AbstractController
         // Usar el servicio para eliminar la guardia (incluye eliminar notificaciones relacionadas)
         $guardService->deleteGuard($guard);
 
-        return new JsonResponse([
+        $response = new JsonResponse([
             'message' => 'Guard deleted successfully',
         ], Response::HTTP_OK);
+        
+        // Header para notificar al frontend que actualice
+        $response->headers->set('X-Notifications-Updated', 'true');
+        
+        return $response;
     }
 
     #[Route('/{id}/assignments', name: 'api_guards_assignments', methods: ['GET'])]

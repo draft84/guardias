@@ -250,6 +250,16 @@ export const useNotificationStore = defineStore('notification', {
 
     setPage(page) {
       this.currentPage = page
+    },
+
+    // Forzar recarga de notificaciones (para eventos en tiempo real)
+    async reloadNotifications() {
+      await this.fetchNotifications({
+        page: this.currentPage,
+        limit: this.itemsPerPage,
+        search: this.searchQuery,
+        filterType: this.filterType
+      })
     }
   }
 })

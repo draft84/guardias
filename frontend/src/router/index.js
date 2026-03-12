@@ -8,6 +8,8 @@ import DepartmentsView from '@/views/DepartmentsView.vue'
 import UsersView from '@/views/UsersView.vue'
 import GuardsView from '@/views/GuardsView.vue'
 import CalendarView from '@/views/CalendarView.vue'
+import TasksView from '@/views/TasksView.vue'
+import BitacoraView from '@/views/BitacoraView.vue'
 import SettingsView from '@/views/SettingsView.vue'
 import NotificationsView from '@/views/NotificationsView.vue'
 import NotFoundView from '@/views/NotFoundView.vue'
@@ -56,6 +58,16 @@ const routes = [
         path: 'calendar',
         name: 'Calendar',
         component: CalendarView
+      },
+      {
+        path: 'tasks',
+        name: 'Tasks',
+        component: TasksView
+      },
+      {
+        path: 'bitacora',
+        name: 'Bitacora',
+        component: BitacoraView
       },
       {
         path: 'notifications',

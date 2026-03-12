@@ -39,6 +39,9 @@ class Shift
     #[ORM\Column(length: 7, options: ['default' => '#3498db'])]
     private ?string $color = '#3498db';
 
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $description = null;
+
     #[ORM\Column(options: ['default' => true])]
     private ?bool $active = true;
 
@@ -48,10 +51,14 @@ class Shift
     #[ORM\Column(type: Types::DATETIME_MUTABLE)]
     private ?\DateTimeInterface $updatedAt = null;
 
+    #[ORM\OneToMany(targetEntity: Task::class, mappedBy: 'shift')]
+    private Collection $tasks;
+
     public function __construct()
     {
         $this->createdAt = new \DateTime();
         $this->updatedAt = new \DateTime();
+        $this->tasks = new ArrayCollection();
     }
 
     public function getId(): ?Uuid
@@ -125,6 +132,17 @@ class Shift
         return $this;
     }
 
+    public function getDescription(): ?string
+    {
+        return $this->description;
+    }
+
+    public function setDescription(?string $description): static
+    {
+        $this->description = $description;
+        return $this;
+    }
+
     public function isActive(): ?bool
     {
         return $this->active;
@@ -156,6 +174,14 @@ class Shift
     {
         $this->updatedAt = $updatedAt;
         return $this;
+    }
+
+    /**
+     * @return Collection<int, Task>
+     */
+    public function getTasks(): Collection
+    {
+        return $this->tasks;
     }
 
     #[ORM\PreUpdate]

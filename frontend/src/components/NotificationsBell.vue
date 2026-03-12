@@ -142,7 +142,7 @@ const closeDropdown = () => {
 }
 
 const startPolling = () => {
-  // Actualizar cada 10 segundos
+  // Actualizar cada 10 segundos (solo contador)
   pollingInterval = setInterval(() => {
     notificationStore.fetchUnreadCount()
   }, 10000)

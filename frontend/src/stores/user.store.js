@@ -83,6 +83,36 @@ export const useUserStore = defineStore('user', {
       await this.fetchLevels()
     },
 
+    async fetchUsersByDepartment(departmentId) {
+      this.loading = true
+      this.error = null
+
+      const token = localStorage.getItem('token')
+
+      try {
+        const response = await fetch(`${API_URL}/api/users/department/${departmentId}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(errorData.message || `Error ${response.status}: ${response.statusText}`)
+        }
+
+        const data = await response.json()
+        return { users: data.users || [] }
+      } catch (error) {
+        this.error = error.message
+        console.error('Error fetching users by department:', error)
+        return { users: [] }
+      } finally {
+        this.loading = false
+      }
+    },
+
     async fetchUsers() {
       this.loading = true
       this.error = null

@@ -18,12 +18,12 @@
           <span v-if="!sidebarCollapsed">Departamentos</span>
         </router-link>
 
-        <router-link to="/users" class="nav-item">
+        <router-link v-if="authStore.isAdmin" to="/users" class="nav-item">
           <i class="pi pi-users"></i>
           <span v-if="!sidebarCollapsed">Usuarios</span>
         </router-link>
 
-        <router-link to="/guards" class="nav-item">
+        <router-link v-if="authStore.isManagerOrAdmin" to="/guards" class="nav-item">
           <i class="pi pi-shield"></i>
           <span v-if="!sidebarCollapsed">Guardias</span>
         </router-link>
@@ -31,6 +31,16 @@
         <router-link to="/calendar" class="nav-item">
           <i class="pi pi-calendar"></i>
           <span v-if="!sidebarCollapsed">Calendario</span>
+        </router-link>
+
+        <router-link v-if="authStore.isManagerOrAdmin" to="/tasks" class="nav-item">
+          <i class="pi pi-list"></i>
+          <span v-if="!sidebarCollapsed">Tareas</span>
+        </router-link>
+
+        <router-link to="/bitacora" class="nav-item">
+          <i class="pi pi-compass"></i>
+          <span v-if="!sidebarCollapsed">Bitácora</span>
         </router-link>
 
         <router-link to="/notifications" class="nav-item">

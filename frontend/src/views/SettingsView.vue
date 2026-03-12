@@ -32,6 +32,10 @@
             <i class="pi pi-key mr-2"></i>
             <span>Roles</span>
           </Tab>
+          <Tab value="3">
+            <i class="pi pi-calendar mr-2"></i>
+            <span>Turnos</span>
+          </Tab>
         </TabList>
 
         <TabPanels>
@@ -188,6 +192,124 @@
               </div>
             </div>
           </TabPanel>
+
+          <!-- PANEL TURNOS -->
+          <TabPanel value="3">
+            <div class="p-4">
+              <!-- Header con título y botón -->
+              <div class="flex align-items-center justify-content-between mb-4">
+                <div>
+                  <h3 class="text-xl font-bold m-0">Turnos del Sistema</h3>
+                  <p class="text-500 text-sm m-0 mt-1">Define los turnos disponibles (mañana, tarde, noche, etc.).</p>
+                </div>
+              </div>
+
+              <!-- Formulario de agregado -->
+              <div class="surface-50 border-round-xl p-4 mb-4">
+                <div class="grid gap-3 align-items-end">
+                  <div class="col-12 md:col-3">
+                    <label class="block text-sm font-semibold mb-2">Nombre</label>
+                    <InputText v-model="newShiftName" placeholder="Ej: Turno Mañana" class="w-full" />
+                  </div>
+                  <div class="col-12 md:col-2">
+                    <label class="block text-sm font-semibold mb-2">Código</label>
+                    <InputText v-model="newShiftCode" placeholder="MORNING" class="w-full" />
+                  </div>
+                  <div class="col-12 md:col-2">
+                    <label class="block text-sm font-semibold mb-2">Hora Inicio</label>
+                    <InputText v-model="newShiftStartTime" type="time" class="w-full" />
+                  </div>
+                  <div class="col-12 md:col-2">
+                    <label class="block text-sm font-semibold mb-2">Hora Fin</label>
+                    <InputText v-model="newShiftEndTime" type="time" class="w-full" />
+                  </div>
+                  <div class="col-12 md:col-2">
+                    <label class="block text-sm font-semibold mb-2">Tipo</label>
+                    <Select v-model="newShiftType" :options="shiftTypes" optionLabel="label" optionValue="value" placeholder="Tipo" class="w-full" />
+                  </div>
+                  <div class="col-12 md:col-12">
+                    <label class="block text-sm font-semibold mb-2">Descripción (opcional)</label>
+                    <InputText v-model="newShiftDescription" placeholder="Descripción del turno" class="w-full" />
+                  </div>
+                  <div class="col-12 text-right">
+                    <Button
+                      label="Agregar Turno"
+                      icon="pi pi-plus"
+                      @click="addShift"
+                      :disabled="!newShiftName || !newShiftCode || !newShiftStartTime || !newShiftEndTime"
+                      severity="primary"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <!-- Tabla de turnos -->
+              <div>
+                <DataTable :value="shiftStore.shifts" v-model:editingRows="editingShiftsRows" class="p-datatable-sm border-1 surface-border border-round overflow-hidden" :loading="shiftStore.loading" editMode="row" @row-edit-save="onShiftEditSave">
+                  <Column field="name" header="Nombre">
+                    <template #editor="{ data, field }">
+                      <InputText v-model="data[field]" autofocus class="w-full" />
+                    </template>
+                  </Column>
+                  <Column field="code" header="Código">
+                    <template #body="{ data }">
+                      <Tag :value="data.code" severity="secondary" />
+                    </template>
+                    <template #editor="{ data, field }">
+                      <InputText v-model="data[field]" autofocus class="w-full" placeholder="Ej: MORNING" />
+                    </template>
+                  </Column>
+                  <Column field="startTime" header="Inicio">
+                    <template #editor="{ data, field }">
+                      <InputText v-model="data[field]" type="time" autofocus class="w-full" />
+                    </template>
+                  </Column>
+                  <Column field="endTime" header="Fin">
+                    <template #editor="{ data, field }">
+                      <InputText v-model="data[field]" type="time" autofocus class="w-full" />
+                    </template>
+                  </Column>
+                  <Column field="type" header="Tipo">
+                    <template #body="{ data }">
+                      <Tag :value="getShiftTypeLabel(data.type)" :severity="getShiftTypeSeverity(data.type)" />
+                    </template>
+                    <template #editor="{ data, field }">
+                      <Select v-model="data[field]" :options="shiftTypes" optionLabel="label" optionValue="value" class="w-full" />
+                    </template>
+                  </Column>
+                  <Column field="description" header="Descripción">
+                    <template #editor="{ data, field }">
+                      <InputText v-model="data[field]" autofocus class="w-full" />
+                    </template>
+                  </Column>
+                  <Column field="isUsed" header="Estado" style="min-width: 8rem">
+                    <template #body="{ data }">
+                      <Tag :value="data.isUsed ? 'En uso' : 'Disponible'" :severity="data.isUsed ? 'success' : 'secondary'" />
+                    </template>
+                  </Column>
+                  <Column :rowEditor="true" style="width: 3rem" bodyStyle="text-align:center"></Column>
+                  <Column header="Acciones" style="width: 3rem" class="text-center">
+                    <template #body="slotProps">
+                      <Button
+                        icon="pi pi-trash"
+                        severity="danger"
+                        text
+                        rounded
+                        @click="removeShift(slotProps.data)"
+                        :title="slotProps.data.isUsed ? 'Este turno está en uso y no se puede eliminar' : 'Eliminar turno'"
+                        :disabled="slotProps.data.isUsed"
+                      />
+                    </template>
+                  </Column>
+                </DataTable>
+
+                <Message severity="info" :closable="false" class="mt-4">
+                  <i class="pi pi-info-circle mr-2"></i>
+                  Los turnos en uso no pueden ser eliminados.
+                </Message>
+              </div>
+            </div>
+          </TabPanel>
         </TabPanels>
       </Tabs>
     </div>
@@ -198,6 +320,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth.store'
 import { useUserStore } from '@/stores/user.store'
+import { useShiftStore } from '@/stores/shift.store'
 import { useConfirm } from 'primevue/useconfirm'
 import { useToast } from 'primevue/usetoast'
 import Button from 'primevue/button'
@@ -213,9 +336,11 @@ import TabPanels from 'primevue/tabpanels'
 import TabPanel from 'primevue/tabpanel'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
+import Select from 'primevue/select'
 
 const authStore = useAuthStore()
 const userStore = useUserStore()
+const shiftStore = useShiftStore()
 const confirm = useConfirm()
 const toast = useToast()
 const changingPassword = ref(false)
@@ -225,10 +350,30 @@ const newRoleName = ref('')
 const newRoleDescription = ref('')
 const editingRows = ref([])
 const editingRolesRows = ref([])
+const editingShiftsRows = ref([])
+
+// Variables para Turnos
+const newShiftName = ref('')
+const newShiftCode = ref('')
+const newShiftStartTime = ref('')
+const newShiftEndTime = ref('')
+const newShiftType = ref('custom')
+const newShiftDescription = ref('')
+
+const shiftTypes = [
+  { label: 'Mañana', value: 'morning' },
+  { label: 'Tarde', value: 'afternoon' },
+  { label: 'Noche', value: 'night' },
+  { label: 'Todo el día', value: 'full_day' },
+  { label: 'Personalizado', value: 'custom' }
+]
+
+const API_URL = 'http://localhost:8000'
 
 onMounted(() => {
   userStore.fetchLevels()
   userStore.fetchRoles()
+  shiftStore.fetchShifts()
 })
 
 const getRoleSeverity = (roleName) => {
@@ -330,6 +475,91 @@ const removeRole = (role) => {
       try {
         await userStore.deleteRole(role.id)
         toast.add({ severity: 'success', summary: 'Eliminado', detail: 'Rol eliminado correctamente', life: 3000 })
+      } catch (error) {
+        toast.add({ severity: 'error', summary: 'Error', detail: error.message, life: 3000 })
+      }
+    }
+  })
+}
+
+// Funciones para Turnos
+const getShiftTypeLabel = (type) => {
+  const found = shiftTypes.find(t => t.value === type)
+  return found ? found.label : type
+}
+
+const getShiftTypeSeverity = (type) => {
+  switch (type) {
+    case 'morning': return 'success'
+    case 'afternoon': return 'warning'
+    case 'night': return 'contrast'
+    case 'full_day': return 'info'
+    default: return 'secondary'
+  }
+}
+
+const addShift = async () => {
+  if (!newShiftName.value.trim() || !newShiftCode.value.trim()) return
+  try {
+    await shiftStore.createShift(
+      newShiftName.value.trim(),
+      newShiftCode.value.trim().toUpperCase().replace(/\s/g, '_'),
+      newShiftStartTime.value,
+      newShiftEndTime.value,
+      newShiftType.value,
+      '#3498db',
+      newShiftDescription.value.trim()
+    )
+    newShiftName.value = ''
+    newShiftCode.value = ''
+    newShiftStartTime.value = ''
+    newShiftEndTime.value = ''
+    newShiftType.value = 'custom'
+    newShiftDescription.value = ''
+    toast.add({ severity: 'success', summary: 'Éxito', detail: 'Turno creado correctamente', life: 3000 })
+  } catch (error) {
+    toast.add({ severity: 'error', summary: 'Error', detail: error.message, life: 3000 })
+  }
+}
+
+const onShiftEditSave = async (event) => {
+  let { data, newData } = event
+  if (newData.name.trim().length > 0) {
+    try {
+      await shiftStore.updateShift(
+        newData.id,
+        newData.name.trim(),
+        newData.code.trim().toUpperCase().replace(/\s/g, '_'),
+        newData.startTime,
+        newData.endTime,
+        newData.type,
+        '#3498db',
+        newData.description
+      )
+      toast.add({ severity: 'success', summary: 'Actualizado', detail: 'Turno actualizado correctamente', life: 3000 })
+    } catch (error) {
+      toast.add({ severity: 'error', summary: 'Error', detail: error.message, life: 3000 })
+    }
+  } else {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'El nombre no puede estar vacío', life: 3000 })
+  }
+}
+
+const removeShift = (shift) => {
+  if (shift.isUsed) {
+    toast.add({ severity: 'warn', summary: 'No permitido', detail: 'Turno en uso', life: 3000 })
+    return
+  }
+
+  confirm.require({
+    message: `¿Estás seguro de eliminar el turno "${shift.name}"?`,
+    header: 'Confirmación',
+    icon: 'pi pi-exclamation-triangle',
+    acceptClass: 'p-button-danger',
+    accept: async () => {
+      try {
+        await shiftStore.deleteShift(shift.id)
+        toast.add({ severity: 'success', summary: 'Eliminado', detail: 'Turno eliminado correctamente', life: 3000 })
       } catch (error) {
         toast.add({ severity: 'error', summary: 'Error', detail: error.message, life: 3000 })
       }

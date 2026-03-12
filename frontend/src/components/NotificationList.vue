@@ -113,9 +113,9 @@
             <div class="p-4 pt-0">
               <NotificationDetail
                 :notification="notification"
-                @accepted="handleNotificationUpdate"
-                @rejected="handleNotificationUpdate"
-                @updated="handleNotificationUpdate"
+                @accepted="handleNotificationAction"
+                @rejected="handleNotificationAction"
+                @updated="handleNotificationAction"
               />
             </div>
           </AccordionContent>
@@ -161,7 +161,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useNotificationStore } from '@/stores/notification.store'
 import { useToast } from 'primevue/usetoast'
 import Accordion from 'primevue/accordion'
@@ -286,7 +286,7 @@ const handleMarkAllAsRead = async () => {
 }
 
 // Actualizar después de acción
-const handleNotificationUpdate = () => {
+const handleNotificationAction = () => {
   loadNotifications(currentPage.value)
   emit('notification-action')
 }
@@ -367,8 +367,26 @@ watch(() => selectedFilter.value, () => {
   loadNotifications(1)
 })
 
+// Escuchar eventos personalizados para actualizaciones inmediatas
+const handleGlobalNotificationUpdate = (event) => {
+  console.log('🔔 Event received:', event.type, event.detail)
+  notificationStore.reloadNotifications()
+}
+
 onMounted(() => {
   loadNotifications(1)
+  
+  // Escuchar eventos de actualización
+  window.addEventListener('notifications-updated', handleGlobalNotificationUpdate)
+  window.addEventListener('guard-deleted', handleGlobalNotificationUpdate)
+  window.addEventListener('assignment-deleted', handleGlobalNotificationUpdate)
+})
+
+onUnmounted(() => {
+  // Limpiar listeners
+  window.removeEventListener('notifications-updated', handleGlobalNotificationUpdate)
+  window.removeEventListener('guard-deleted', handleGlobalNotificationUpdate)
+  window.removeEventListener('assignment-deleted', handleGlobalNotificationUpdate)
 })
 </script>
 

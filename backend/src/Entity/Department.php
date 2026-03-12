@@ -52,11 +52,15 @@ class Department
     #[ORM\OneToMany(targetEntity: Guard::class, mappedBy: 'department')]
     private Collection $guards;
 
+    #[ORM\OneToMany(targetEntity: Task::class, mappedBy: 'department')]
+    private Collection $tasks;
+
     public function __construct()
     {
         $this->children = new ArrayCollection();
         $this->users = new ArrayCollection();
         $this->guards = new ArrayCollection();
+        $this->tasks = new ArrayCollection();
         $this->createdAt = new \DateTime();
         $this->updatedAt = new \DateTime();
     }
@@ -165,6 +169,33 @@ class Department
     public function getGuards(): Collection
     {
         return $this->guards;
+    }
+
+    /**
+     * @return Collection<int, Task>
+     */
+    public function getTasks(): Collection
+    {
+        return $this->tasks;
+    }
+
+    public function addTask(Task $task): static
+    {
+        if (!$this->tasks->contains($task)) {
+            $this->tasks->add($task);
+            $task->setDepartment($this);
+        }
+        return $this;
+    }
+
+    public function removeTask(Task $task): static
+    {
+        if ($this->tasks->removeElement($task)) {
+            if ($task->getDepartment() === $this) {
+                $task->setDepartment(null);
+            }
+        }
+        return $this;
     }
 
     #[ORM\PreUpdate]

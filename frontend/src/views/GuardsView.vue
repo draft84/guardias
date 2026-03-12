@@ -7,7 +7,18 @@
         <i class="pi pi-shield text-3xl text-primary"></i>
         <h2 class="text-2xl font-bold m-0">Guardias</h2>
       </div>
-      <Button label="Nueva Guardia" icon="pi pi-plus" @click="openNewGuard" />
+      <div class="flex align-items-center gap-2">
+        <Button 
+          label="Exportar" 
+          icon="pi pi-download" 
+          severity="secondary"
+          outlined
+          @click="exportToExcel" 
+          :loading="exporting"
+          v-tooltip.top="'Exportar guardias a Excel'"
+        />
+        <Button label="Nueva Guardia" icon="pi pi-plus" @click="openNewGuard" />
+      </div>
     </div>
 
     <!-- DataTable -->
@@ -221,6 +232,7 @@ const guardDialog = ref(false)
 const editingGuard = ref(null)
 const submitted = ref(false)
 const saving = ref(false)
+const exporting = ref(false)
 const departments = ref([])
 const usersByDepartment = ref([])
 
@@ -281,6 +293,59 @@ const resetForm = () => {
 const hideDialog = () => {
   guardDialog.value = false
   submitted.value = false
+}
+
+const exportToExcel = async () => {
+  exporting.value = true
+  try {
+    const token = localStorage.getItem('token')
+    const url = `${API_URL}/api/guards/export`
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    })
+    
+    if (!response.ok) {
+      throw new Error('Error al exportar')
+    }
+    
+    // Crear blob desde la respuesta
+    const blob = await response.blob()
+    
+    // Crear URL para el blob
+    const downloadUrl = window.URL.createObjectURL(blob)
+    
+    // Crear enlace y descargar
+    const link = document.createElement('a')
+    link.href = downloadUrl
+    link.download = `guardias_${new Date().toISOString().split('T')[0]}.xlsx`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    
+    // Limpiar URL
+    window.URL.revokeObjectURL(downloadUrl)
+    
+    toast.add({
+      severity: 'success',
+      summary: 'Éxito',
+      detail: 'Guardias exportadas correctamente',
+      life: 3000
+    })
+  } catch (error) {
+    console.error('Error exporting guards:', error)
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: 'Error al exportar guardias',
+      life: 3000
+    })
+  } finally {
+    exporting.value = false
+  }
 }
 
 const openNewGuard = () => {
