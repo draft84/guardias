@@ -243,7 +243,7 @@ const handleAcceptSwap = async () => {
   try {
     const token = localStorage.getItem('token')
     const response = await fetch(
-      `http://localhost:8000/api/notifications/${props.notification.id}/accept-swap`,
+      `http://localhost:10000/api/notifications/${props.notification.id}/accept-swap`,
       {
         method: 'POST',
         headers: {
@@ -299,7 +299,7 @@ const handleRejectSwap = async () => {
   try {
     const token = localStorage.getItem('token')
     const response = await fetch(
-      `http://localhost:8000/api/notifications/${props.notification.id}/reject-swap`,
+      `http://localhost:10000/api/notifications/${props.notification.id}/reject-swap`,
       {
         method: 'POST',
         headers: {
@@ -344,7 +344,7 @@ const markAsRead = async () => {
   try {
     const token = localStorage.getItem('token')
     await fetch(
-      `http://localhost:8000/api/notifications/${props.notification.id}/read`,
+      `http://localhost:10000/api/notifications/${props.notification.id}/read`,
       {
         method: 'PUT',
         headers: {

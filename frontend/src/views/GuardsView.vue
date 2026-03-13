@@ -219,7 +219,7 @@ import Textarea from 'primevue/textarea'
 import IconField from 'primevue/iconfield'
 import InputIcon from 'primevue/inputicon'
 
-const API_URL = 'http://localhost:8000'
+const API_URL = 'http://localhost:10000'
 
 const guardStore = useGuardStore()
 const departmentStore = useDepartmentStore()

@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 
-const API_URL = 'http://localhost:8000'
+const API_URL = 'http://localhost:10000'
 
 export const useNotificationStore = defineStore('notification', {
   state: () => ({

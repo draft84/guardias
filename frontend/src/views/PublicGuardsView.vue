@@ -1,97 +1,80 @@
 <template>
-  <div class="public-container p-4">
-    <div class="header mb-6 text-center">
-      <h1 class="text-4xl font-bold text-primary mb-2">🛡️ Guardias de Hoy</h1>
-      <p class="text-xl text-500">{{ formattedDate }}</p>
+  <div class="public-container">
+    <!-- Header Bar -->
+    <div class="header-bar surface-card shadow-2 px-4 py-3 mb-4">
+      <div class="container flex justify-content-between align-items-center">
+        <div class="flex align-items-center gap-3">
+          <i class="pi pi-shield text-2xl text-primary"></i>
+          <h1 class="text-xl font-bold text-primary m-0">Guardias de Hoy</h1>
+        </div>
+        <RouterLink to="/login">
+          <Button label="Iniciar Sesión" icon="pi pi-sign-in" />
+        </RouterLink>
+      </div>
     </div>
+
+    <!-- Contenido Principal -->
+    <div class="container py-4">
+      <div class="text-center mb-4">
+        <p class="text-xl text-500 m-0">{{ formattedDate }}</p>
+      </div>
 
     <div v-if="loading" class="flex justify-content-center p-8">
       <i class="pi pi-spin pi-spinner text-4xl text-primary"></i>
     </div>
 
-    <div v-else-if="groupedGuards.length === 0" class="surface-card p-8 border-round-xl shadow-2 text-center">
+    <div v-else-if="guardsByDepartment.length === 0" class="surface-card p-8 border-round-xl shadow-2 text-center">
       <i class="pi pi-calendar-times text-6xl text-300 mb-4"></i>
       <h2 class="text-2xl font-bold text-700">No hay guardias programadas para hoy</h2>
       <p class="text-500">Vuelve a consultar más tarde.</p>
     </div>
 
-    <div v-else class="grid justify-content-center">
-      <div v-for="group in groupedGuards" :key="group.departmentId" class="col-12 md:col-8 lg:col-6 mb-4">
-        <div class="surface-card border-round-xl shadow-2 overflow-hidden border-left-3 border-primary">
-          <div class="p-4 bg-primary-reverse flex align-items-center justify-content-between">
-            <h3 class="text-xl font-bold m-0 flex align-items-center gap-2">
-              <i class="pi pi-building"></i>
-              {{ group.departmentName }}
-            </h3>
-            <Tag :value="group.guards.length + ' guardia(s)'" severity="info" rounded />
-          </div>
-          
-          <div class="p-0">
-            <div v-for="guard in group.guards" :key="guard.id" 
-                 class="p-4 border-bottom-1 border-100 hover:bg-primary-50 transition-colors cursor-pointer"
-                 @click="showGuardDetail(guard)">
-              <div class="flex justify-content-between align-items-start mb-3">
-                <div>
-                  <h4 class="text-lg font-bold m-0 text-900">{{ guard.guardName }}</h4>
-                  <div class="flex align-items-center gap-2 mt-1 text-600">
-                    <i class="pi pi-clock text-sm"></i>
-                    <span>{{ guard.startTime }} — {{ guard.endTime }}</span>
+    <div v-else class="surface-card border-round-xl shadow-4 overflow-hidden border-1 surface-border mx-auto" style="max-width: 900px;">
+      <!-- Accordion por departamento -->
+      <Accordion :activeIndexes="[0]" multiple>
+        <AccordionPanel v-for="(dept, index) in guardsByDepartment" :key="dept.departmentId" :value="index">
+          <AccordionHeader class="flex align-items-center gap-2">
+            <i class="pi pi-building text-primary" />
+            <span class="font-semibold">{{ dept.departmentName }}</span>
+            <Tag :value="dept.guards.length" severity="secondary" class="ml-auto" />
+          </AccordionHeader>
+          <AccordionContent>
+            <DataTable :value="dept.guards" responsiveLayout="scroll" size="small">
+              <Column header="Nivel" style="min-width: 5rem;">
+                <template #body="{ data }">
+                  <Tag v-if="data.userLevel" :value="data.userLevel" severity="info" />
+                  <span v-else class="text-color-secondary">-</span>
+                </template>
+              </Column>
+              <Column header="Usuario" style="min-width: 12rem;">
+                <template #body="{ data }">
+                  <div class="flex align-items-center gap-2">
+                    <i class="pi pi-user text-color-secondary" />
+                    <span>{{ data.userName }}</span>
                   </div>
-                </div>
-                <Tag v-if="guard.status === 'scheduled'" value="Programada" severity="success" outlined />
-              </div>
-              
-              <div class="flex align-items-center gap-3">
-                <div class="flex align-items-center justify-content-center border-round-full bg-blue-100" style="width:40px; height:40px;">
-                  <i class="pi pi-user text-blue-600"></i>
-                </div>
-                <div>
-                  <p class="m-0 font-bold text-800">{{ guard.userName }}</p>
-                  <Tag v-if="guard.userLevel" :value="guard.userLevel" severity="secondary" class="mt-1" style="font-size: 0.7rem" />
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+                </template>
+              </Column>
+              <Column header="Teléfono" style="min-width: 9rem;">
+                <template #body="{ data }">
+                  <span v-if="data.userPhone" class="text-sm">
+                    <i class="pi pi-phone mr-1 text-color-secondary" />{{ data.userPhone }}
+                  </span>
+                  <span v-else class="text-color-secondary">-</span>
+                </template>
+              </Column>
+              <Column header="Horario" style="min-width: 10rem;">
+                <template #body="{ data }">
+                  <span class="flex align-items-center gap-2">
+                    <i class="pi pi-clock text-primary" />
+                    {{ data.startTime }} — {{ data.endTime }}
+                  </span>
+                </template>
+              </Column>
+            </DataTable>
+          </AccordionContent>
+        </AccordionPanel>
+      </Accordion>
     </div>
-
-    <!-- Dialogo de Detalle -->
-    <Dialog v-model:visible="showDetail" modal header="Detalle de la Guardia" :style="{ width: '90vw', maxWidth: '450px' }">
-      <div v-if="selectedGuard" class="p-2">
-        <div class="text-center mb-4">
-          <div class="inline-flex align-items-center justify-content-center border-round-circle bg-primary-100 mb-3" style="width:80px; height:80px;">
-            <i class="pi pi-shield text-4xl text-primary"></i>
-          </div>
-          <h2 class="text-2xl font-bold m-0 text-900">{{ selectedGuard.guardName }}</h2>
-        </div>
-
-        <Divider />
-
-        <div class="grid">
-          <div class="col-6 mb-3">
-            <span class="block text-500 font-bold mb-1 text-xs uppercase">HORARIO</span>
-            <span class="text-900 font-medium">{{ selectedGuard.startTime }} — {{ selectedGuard.endTime }}</span>
-          </div>
-          <div class="col-6 mb-3">
-            <span class="block text-500 font-bold mb-1 text-xs uppercase">ESTADO</span>
-            <Tag value="ACTIVA" severity="success" />
-          </div>
-          <div class="col-12">
-            <span class="block text-500 font-bold mb-2 text-xs uppercase text-center">PERSONAL ASIGNADO</span>
-            <div class="surface-100 p-3 border-round-lg text-center">
-              <div class="text-xl font-bold text-900">{{ selectedGuard.userName }}</div>
-              <div class="text-600 mt-1">{{ selectedGuard.userLevel || 'Personal' }}</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </Dialog>
-
-    <div class="fixed bottom-0 left-0 w-full p-4 flex justify-content-center bg-white-alpha-90" style="backdrop-filter: blur(8px)">
-      <RouterLink to="/login">
-        <Button label="Acceso Administrador" icon="pi pi-lock" text severity="secondary" />
-      </RouterLink>
     </div>
   </div>
 </template>
@@ -103,8 +86,14 @@ import Tag from 'primevue/tag'
 import Dialog from 'primevue/dialog'
 import Divider from 'primevue/divider'
 import Button from 'primevue/button'
+import Accordion from 'primevue/accordion'
+import AccordionPanel from 'primevue/accordionpanel'
+import AccordionHeader from 'primevue/accordionheader'
+import AccordionContent from 'primevue/accordioncontent'
+import DataTable from 'primevue/datatable'
+import Column from 'primevue/column'
 
-const API_URL = 'http://localhost:8000'
+const API_URL = 'http://localhost:10000'
 const groupedGuards = ref([])
 const loading = ref(true)
 const showDetail = ref(false)
@@ -136,6 +125,11 @@ const showGuardDetail = (guard) => {
   showDetail.value = true
 }
 
+// Los datos ya vienen agrupados por departamento desde el backend
+const guardsByDepartment = computed(() => {
+  return groupedGuards.value || []
+})
+
 onMounted(() => {
   fetchPublicGuards()
 })
@@ -145,15 +139,48 @@ onMounted(() => {
 .public-container {
   min-height: 100vh;
   background-color: var(--surface-ground);
-  padding-bottom: 80px !important;
 }
 
-.bg-primary-reverse {
-  background-color: var(--primary-50);
-  color: var(--primary-700);
+.header-bar {
+  background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+  color: white;
+  height: 64px;
 }
 
-.hover\:bg-primary-50:hover {
-  background-color: var(--primary-50);
+.header-bar .container {
+  height: 100%;
+}
+
+.header-bar .text-primary {
+  color: white !important;
+}
+
+.header-bar i {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.header-bar :deep(.p-button) {
+  background-color: #047857;
+  color: white;
+  border: none;
+  font-weight: 600;
+  padding: 0.5rem 1rem;
+}
+
+.header-bar :deep(.p-button:hover) {
+  background-color: #065f46;
+}
+
+.header-bar :deep(.p-button .p-button-label) {
+  color: white;
+}
+
+.header-bar :deep(.p-button .p-button-icon) {
+  color: white;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
 }
 </style>

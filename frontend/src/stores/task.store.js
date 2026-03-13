@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import api from '@/services/api'
 
-const API_URL = 'http://localhost:8000'
+const API_URL = 'http://localhost:10000'
 
 export const useTaskStore = defineStore('task', {
   state: () => ({

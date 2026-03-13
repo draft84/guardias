@@ -368,7 +368,7 @@ const shiftTypes = [
   { label: 'Personalizado', value: 'custom' }
 ]
 
-const API_URL = 'http://localhost:8000'
+const API_URL = 'http://localhost:10000'
 
 onMounted(() => {
   userStore.fetchLevels()

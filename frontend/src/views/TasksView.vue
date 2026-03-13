@@ -92,10 +92,9 @@
       :value="filteredTasks"
       responsiveLayout="scroll"
       stripedRows
-      size="small"
       class="tasks-table"
     >
-      <Column field="title" header="Título" style="min-width: 200px">
+      <Column field="title" header="Título" style="min-width: 250px">
         <template #body="{ data }">
           <div class="flex flex-column gap-1">
             <span class="font-semibold">{{ data.title }}</span>
@@ -104,39 +103,39 @@
         </template>
       </Column>
 
-      <Column field="startTime" header="Horario" style="min-width: 100px">
+      <Column field="startTime" header="Horario" style="min-width: 130px">
         <template #body="{ data }">
           {{ data.startTime }} - {{ data.endTime }}
         </template>
       </Column>
 
-      <Column field="department.name" header="Departamento" style="min-width: 150px">
+      <Column field="department.name" header="Departamento" style="min-width: 180px">
         <template #body="{ data }">
           <Tag :value="data.department.name" severity="info" size="small" />
         </template>
       </Column>
 
-      <Column field="shift.name" header="Turno" style="min-width: 120px">
+      <Column field="shift.name" header="Turno" style="min-width: 150px">
         <template #body="{ data }">
-          <Tag 
-            :value="data.shift.name" 
+          <Tag
+            :value="data.shift.name"
             :severity="getShiftSeverity(data.shift.type)"
             size="small"
           />
         </template>
       </Column>
 
-      <Column field="status" header="Estado" style="min-width: 120px">
+      <Column field="status" header="Estado" style="min-width: 140px">
         <template #body="{ data }">
-          <Tag 
-            :value="getStatusLabel(data.status)" 
-            :severity="getStatusSeverity(data.status)" 
+          <Tag
+            :value="getStatusLabel(data.status)"
+            :severity="getStatusSeverity(data.status)"
             size="small"
           />
         </template>
       </Column>
 
-      <Column field="actions" header="Acciones" style="min-width: 180px">
+      <Column field="actions" header="Acciones" style="min-width: 200px">
         <template #body="{ data }">
           <div class="flex gap-2">
             <Button
@@ -361,7 +360,7 @@ const authStore = useAuthStore()
 const shiftStore = useShiftStore()
 const toast = useToast()
 
-const API_URL = 'http://localhost:8000'
+const API_URL = 'http://localhost:10000'
 
 const loading = ref(false)
 const savingTask = ref(false)
@@ -689,12 +688,15 @@ onMounted(async () => {
 
 <style scoped>
 .tasks-view {
-  max-width: 1400px;
-  margin: 0 auto;
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
 }
 
 .tasks-table {
   background: var(--surface-card);
+  width: 100%;
 }
 
 .line-clamp-1 {

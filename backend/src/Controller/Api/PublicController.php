@@ -6,6 +6,8 @@ namespace App\Controller\Api;
 
 use App\Repository\GuardAssignmentRepository;
 use App\Repository\DepartmentRepository;
+use libphonenumber\PhoneNumberFormat;
+use libphonenumber\PhoneNumberUtil;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
@@ -43,13 +45,18 @@ class PublicController extends AbstractController
                 'departmentId' => $deptId,
                 'departmentName' => $dept->getName(),
                 'guards' => array_map(function($a) {
+                    $user = $a->getUser();
+                    $phone = $user->getPhone();
+                    $phoneUtil = PhoneNumberUtil::getInstance();
+                    
                     return [
                         'id' => (string) $a->getId(),
                         'guardName' => $a->getGuard()->getName(),
                         'startTime' => $a->getStartTime()->format('H:i'),
                         'endTime' => $a->getEndTime()->format('H:i'),
-                        'userName' => $a->getUser()->getFullName(),
-                        'userLevel' => $a->getUser()->getGuardLevel()?->getName(),
+                        'userName' => $user->getFullName(),
+                        'userLevel' => $user->getGuardLevel()?->getName(),
+                        'userPhone' => $phone ? $phoneUtil->format($phone, PhoneNumberFormat::NATIONAL) : null,
                         'status' => $a->getStatus(),
                     ];
                 }, array_values($deptAssignments))

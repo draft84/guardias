@@ -914,66 +914,93 @@ const toggleDay = (date) => {
   }
 }
 
-const API_URL = 'http://localhost:8000'
+const API_URL = 'http://localhost:10000'
 
 const loadUsersByDepartment = async (departmentId) => {
   console.log('=== LOAD USERS BY DEPARTMENT ===')
-  
+
   if (!departmentId) {
     console.error('❌ NO DEPARTMENT ID PROVIDED!')
     usersByDepartment.value = []
     return
   }
-  
+
   const token = localStorage.getItem('token')
   console.log('🔑 Token:', token ? '✅ PRESENTE (' + token.substring(0, 20) + '...)' : '❌ NO PRESENTE')
   console.log('📂 Department ID:', departmentId)
-  
+
   try {
     const url = `${API_URL}/api/users/department/${departmentId}`
     console.log('🌐 URL:', url)
-    
+
     const response = await fetch(url, {
-      headers: { 
-        'Authorization': `Bearer ${token}`, 
-        'Content-Type': 'application/json' 
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
       }
     })
-    
+
     console.log('📡 Response status:', response.status)
-    
+
     if (response.status === 401) {
       console.error('❌ ERROR 401: Token inválido o expirado')
       return
     }
-    
+
     if (response.status === 404) {
       console.error('❌ ERROR 404: Departamento no encontrado')
       return
     }
-    
+
     if (response.ok) {
       const data = await response.json()
       console.log('📦 Data received:', data)
       console.log('📦 Data.users:', data.users)
-      
+
       if (!data.users || data.users.length === 0) {
         console.warn('⚠️ NO HAY USUARIOS en este departamento')
         usersByDepartment.value = []
         return
       }
-      
-      // Filtrar para no mostrar el usuario actual
-      const filteredUsers = (data.users || []).filter(
-        u => {
-          const isCurrentUser = u.id === authStore.user?.id
-          if (isCurrentUser) {
-            console.log('🚫 Excluyendo usuario actual:', u.fullName)
-          }
-          return !isCurrentUser
+
+      // Obtener las fechas seleccionadas para el intercambio
+      let datesToCheck = []
+      if (swapType.value === 'single' && selectedAssignment.value?.date) {
+        datesToCheck = [selectedAssignment.value.date]
+      } else if (swapType.value === 'multiple' && selectedDays.value.length > 0) {
+        datesToCheck = selectedDays.value
+      } else if (swapType.value === 'all' && allWeekDays.value.length > 0) {
+        datesToCheck = allWeekDays.value.map(d => d.date)
+      }
+
+      console.log('📅 Dates to check for existing guards:', datesToCheck)
+
+      // Filtrar usuarios
+      const filteredUsers = (data.users || []).filter(u => {
+        // Excluir usuario actual
+        const isCurrentUser = u.id === authStore.user?.id
+        if (isCurrentUser) {
+          console.log('🚫 Excluyendo usuario actual:', u.fullName)
+          return false
         }
-      )
-      
+
+        // Excluir usuarios que ya están de guardia en las fechas seleccionadas
+        const isOnGuardOnSelectedDates = shiftStore.assignments.some(a => {
+          const aUserId = a.user?.id || a.userId
+          const aDate = a.date || a.start?.split(' ')[0]
+          const isSameUser = aUserId === u.id
+          const isOnDate = datesToCheck.includes(aDate)
+          
+          if (isSameUser && isOnDate) {
+            console.log(`🚫 Excluyendo ${u.fullName} - Ya está de guardia el ${aDate}`)
+          }
+          
+          return isSameUser && isOnDate
+        })
+
+        return !isOnGuardOnSelectedDates
+      })
+
       usersByDepartment.value = filteredUsers
       console.log('✅ Usuarios cargados:', usersByDepartment.value.length)
       console.log('👥 Usuarios:', usersByDepartment.value.map(u => u.fullName))

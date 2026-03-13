@@ -41,9 +41,12 @@ class GuardAssignmentRepository extends ServiceEntityRepository
      */
     public function findByDate(\DateTimeInterface $date): array
     {
+        // Convertir a string YYYY-MM-DD para comparar solo la fecha
+        $dateString = $date->format('Y-m-d');
+        
         return $this->createQueryBuilder('ga')
             ->where('ga.date = :date')
-            ->setParameter('date', $date)
+            ->setParameter('date', $dateString)
             ->orderBy('ga.startTime', 'ASC')
             ->getQuery()
             ->getResult();
